@@ -3,4 +3,4 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
-"FAQ"
+st.header("How to Use and FAQs")

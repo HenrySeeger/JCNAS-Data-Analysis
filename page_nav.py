@@ -1,10 +1,10 @@
 import streamlit as st
 
 pages = [st.Page("home.py", title = "Home"),
-         st.Page("data_obj.py", title = "Data Objects Creation and Management"),
+         st.Page("data_obj.py", title = "Managing Data Objects"),
          st.Page("graphing.py", title = "Graphing"),
          st.Page("stats.py", title = "Statistics"),
-         st.Page("faq.py", title = "FAQ")]
+         st.Page("faq.py", title = "How to Use & FAQs")]
 
-pg = st.navigation(pages)
+pg = st.navigation(pages)#, position="top")
 pg.run()

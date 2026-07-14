@@ -1,6 +1,6 @@
-import numpy as np
 import pandas as pd
-import streamlit as st
-import matplotlib.pyplot as plt
 
-"Data Object Management"
+class DataObject:
+  def __init__(self, applications, responses):
+    self.applications = applications
+    self.responses = responses
