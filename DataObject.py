@@ -5,7 +5,7 @@ class DataObject:
     self.name = name
     self.applications = applications
     self.responses = responses
-    self.filter_history = [] # [[filter_type, [arg1, arg2, etc]], [filter_type, [arg1, arg2]]]
+    self.filter_history = [] # Each element{"dataset":dataset, "column":column, "arg1":arg1, "arg2":arg2, etc}
   
   def key_owner(self, key) -> list:
     """
@@ -24,9 +24,17 @@ class DataObject:
     else:
       raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
   
+  def add_filter_history(self, dataset: str, column: any, merge_key = "", **kwargs) -> None:
+    # match dataset:
+    #   case "applications":
+    #     self.responses = pd.merge(self.applications, self.responses)
+    #   case "responses":
+    #     self.applications = pd.merge(self.applications, self.responses)
 
-  def add_filter_history(self, filter_type: str, *args) -> None:
-    self.filter_history.append([filter_type, args])
+    filter = {"dataset" : dataset, "column" : column}
+    for key, val in kwargs.items():
+      filter[key] = val
+    self.filter_history.append(filter)
   
   def undo(self) -> list:
     """
@@ -56,5 +64,5 @@ class DataObject:
     """
     string = ""
     for action in self.filter_history:
-      string.append(f"{action[0]} ({str(action[1])[1:-1]}) | ")
-    return string[:-3]
+      string.append(str(action).replace("'","")[1:-1] + "\n")
+    return string[:-1]
