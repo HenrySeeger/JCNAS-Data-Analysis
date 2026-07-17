@@ -29,7 +29,15 @@ class DataObject:
     else:
       raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
   
-  def add_filter_history(self, dataset: str, column: any, merge_key = "", **kwargs) -> None:
+  def add_filter_history(self, dataset: str, column: any, **kwargs) -> None:
+    """
+    Updates the DataObject's filtration history. It also updates the other datasets that weren't directly filtered
+
+    Args:
+      dataset (str): The name of the dataset used (applications, responses, etc).
+      column (any): The name of the column the filter was applied to. Likely a string.
+      **kwargs: Any keyword arguments relevent to the method of filtration. Each method will have its own standard format.
+    """
     # match dataset:
     #   case "applications":
     #     self.responses = pd.merge(self.applications, self.responses)
