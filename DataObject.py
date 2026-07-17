@@ -1,3 +1,4 @@
+import copy
 import pandas as pd
 
 class DataObject:
@@ -7,6 +8,10 @@ class DataObject:
     self.responses = responses
     self.filter_history = [] # Each element{"dataset":dataset, "column":column, "arg1":arg1, "arg2":arg2, etc}
   
+  @classmethod
+  def from_dataobject(self, name: str, dataobject):
+    return self(name, copy.deepcopy(dataobject.applications), copy.deepcopy(dataobject.responses))
+
   def key_owner(self, key) -> list:
     """
     Takes a key and produces a list of all the contained datasets with the owner in the 0 index position. Checks the applications dataset first.
