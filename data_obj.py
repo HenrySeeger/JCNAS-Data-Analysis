@@ -3,10 +3,13 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import DataObject as do
+from pyproj import Transformer
 import matplotlib.pyplot as plt
 
 st.session_state.setdefault("master_data", None)
 st.session_state.setdefault("data_objects", [])
+
+OSGB36_to_WGS84_transformer = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy = True)
 
 st.header("Managing Data Objects")
 
@@ -21,6 +24,51 @@ with st.expander(label = "Upload Datasets"):
   
   applications_entry = st.file_uploader(label = "Upload the applications dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "applications_entry") 
   responses_entry = st.file_uploader(label = "Upload the responses dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "responses_entry")
+
+def osbg_letters_to_nums(letters):
+  """
+  Takes a string of two letters and converts it to positional coordinates based on the British Ordinance Survey National Grid (OSNG)
+
+  Args:
+    letters (str):
+      Two letters indicating a position in the OSNG (any two letter combintaion, excluding 'I' or 'i').
+      The letters should be capitalized, but the function uses `to_upper()`.
+  
+  Returns:
+    set (integer):
+      Two integers indicating where in the matrix the given letters are located and returns their position relative to the origin 'SV', where up and right are positive directions.
+      The letters are given in the order (Easting, Northing), akin to x and y coordinates.
+  """
+  twenty_five_letters = [chr(i) for i in list(range(65, 73)) + list(range(74, 91))] # Removes the letter 'I'
+  five_letters = [[char for char in twenty_five_letters[i:5 + i]] for i in range(0, 25, 5)] # Converts list of 25 letters to list of lists of 5 letter pair[[A,B,C,D,E],[F,G,H,J,K],...]
+  letter_coords = [[first + second for first in five_letters[i//5] for second in five_letters[i%5]] for i in range(25)] # Creates full 5x5 matrix of 5x5 sub-matrices (25x25)
+  for i in range(25): # Locates where in the matrix the given letters are located and returns their position relative to the origin 'SV', where up and right are positive directions
+    try:
+      return letter_coords[i].index(letters) - 10, 19 - i
+    except:
+      continue
+
+def jcnas_to_osbg(coords):
+  """
+  Takes a coordinate in OSBG format and converts it to decimal latitude and longitude
+
+  Args:
+    coords (str):
+      A string formatted "CC ##### #####", where 'C' is a character and '#' is a number.
+      Neither character should be an 'I'.
+  
+  Returns:
+    set (float):
+      A set containing the decimal latitude and longitude in that order
+  """
+  prefixes = osbg_letters_to_nums(coords[:2])
+
+  easting = int(f"{prefixes[0]}{coords[coords.index(" ") + 1:coords.rfind(" ")]}")
+  northing = int(f"{prefixes[1]}{coords[coords.rfind(" ") + 1:]}")
+
+  lon, lat = OSGB36_to_WGS84_transformer.transform(easting, northing)
+
+  return lat, lon
 
 with st.expander(label = "Create a Data Object"):
   creation_name_input = st.text_input(label = "Name", key = "DataObjectName", placeholder = "Enter data object name", disabled = applications_entry is None or responses_entry is None)
