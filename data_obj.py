@@ -85,7 +85,37 @@ with st.expander(label = "Create a Data Object"):
 
   obj_creation_button = st.button(label = "Create Object", disabled = applications_entry is None or responses_entry is None, on_click = creation_button_on_click)
 
-with st.expander("View Datasets"):
+with st.expander(label = "Manage Data Objects"):
+  data_manager_options = st.selectbox(label = "Manage Options",
+                                      options = ["No Selection", "Delete", "Rename"],
+                                      disabled = applications_entry is None or responses_entry is None)
+
+  def data_manager_formatting(data):
+    return data if type(data) == str else data.name
+  data_manager_data_selector = st.selectbox(label = "Select a data object",
+                                            options = ["No Selection"] + st.session_state.data_objects,
+                                            format_func = data_manager_formatting,
+                                            disabled = applications_entry is None or responses_entry is None)
+  
+  if data_manager_data_selector is not "No Selection":
+    match data_manager_options:
+      case "Delete":
+        data_delete_confirmation = st.toggle(label = f"Confirm deletion of {data_manager_data_selector}", value = False)
+
+        def delete_data(data):
+          print("temp")
+          # Add an st.toast() declaring success or failure
+        data_delete_button = st.button(f"Delete {data_manager_data_selector}", disabled = not data_delete_confirmation, on_click = delete_data)
+      case "Rename":
+        def rename_data(data):
+          print("temp")
+          # Add an st.toast() declaring success or failure
+        data_new_name_text = st.text_input(label = "Enter New Name:")
+        st.text(f"Renaming '{data_manager_data_selector}' to '{data_new_name_text}'")
+        st.button(label = "Rename")
+
+
+with st.expander(label = "View Datasets"):
   # Lets the user directly view (but not edit) the datasets of any DataObjects created, as well the master DataObject
   # Selecting 'No Selection' closes any open viewer
   # All master datasets must uploaded before this can be used, text will inform the user if they are missing one or more master datasets

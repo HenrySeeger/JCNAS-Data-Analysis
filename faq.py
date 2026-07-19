@@ -4,3 +4,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 
 st.header("How to Use and FAQs")
+
+with st.expander(label = "What is a 'DataObject'"):
+  st.text("")
