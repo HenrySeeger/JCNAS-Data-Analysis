@@ -86,18 +86,18 @@ with st.expander(label = "Create a Data Object"):
   obj_creation_button = st.button(label = "Create Object", disabled = applications_entry is None or responses_entry is None, on_click = creation_button_on_click)
 
 with st.expander(label = "Manage Data Objects"):
-  data_manager_options = st.selectbox(label = "Manage Options",
-                                      options = ["No Selection", "Delete", "Rename"],
-                                      disabled = applications_entry is None or responses_entry is None)
-
   def data_manager_formatting(data):
     return data if type(data) == str else data.name
   data_manager_data_selector = st.selectbox(label = "Select a data object",
-                                            options = ["No Selection"] + st.session_state.data_objects,
+                                            options = ["No Selection", "option2"] + st.session_state.data_objects,
                                             format_func = data_manager_formatting,
                                             disabled = applications_entry is None or responses_entry is None)
   
-  if data_manager_data_selector is not "No Selection":
+  data_manager_options = st.selectbox(label = "Manage Options",
+                                      options = ["No Selection", "Delete", "Rename"],
+                                      disabled = applications_entry is None or responses_entry is None or data_manager_data_selector == "No Selection")
+
+  if data_manager_data_selector != "No Selection":
     match data_manager_options:
       case "Delete":
         data_delete_confirmation = st.toggle(label = f"Confirm deletion of {data_manager_data_selector}", value = False)
@@ -111,8 +111,12 @@ with st.expander(label = "Manage Data Objects"):
           print("temp")
           # Add an st.toast() declaring success or failure
         data_new_name_text = st.text_input(label = "Enter New Name:")
-        st.text(f"Renaming '{data_manager_data_selector}' to '{data_new_name_text}'")
-        st.button(label = "Rename")
+        if data_new_name_text != "":
+          st.text(f"Rename '{data_manager_data_selector}' to '{data_new_name_text}'")
+          st.button(label = "Rename")
+  else:
+    data_manager_options = "No Selection"
+    st.text(data_manager_options)
 
 
 with st.expander(label = "View Datasets"):

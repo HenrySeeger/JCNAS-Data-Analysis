@@ -6,7 +6,7 @@ class DataObject:
     self.name = name
     self.applications = applications
     self.responses = responses
-    self.filter_history = [] # Each element{"dataset":dataset, "column":column, "arg1":arg1, "arg2":arg2, etc}
+    self.filter_history = [] # Each element{"filter_code":filtration_type_code, "dataset":dataset, "column":column, "arg1":arg1, "arg2":arg2, etc}
   
   @classmethod
   def from_dataobject(self, name: str, dataobject):
