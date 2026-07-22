@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 st.session_state.setdefault("master_data", None)
 st.session_state.setdefault("data_objects", [])
 
-OSGB36_to_WGS84_transformer = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy = True)
+OSGB36_to_WGS84_transformer = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy = True) # OSGB -> lat/long
 
 st.header("Managing Data Objects")
 
@@ -22,7 +22,16 @@ with st.expander(label = "Upload Datasets"):
     else:
       st.session_state.master_data = None
   
-  applications_entry = st.file_uploader(label = "Upload the applications dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "applications_entry") 
+  if st.session_state.applications_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
+    applications_entry = st.file_uploader(label = "Upload the applications dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "applications_entry") 
+  else:
+    col1, col2 = st.columns(2)
+    with col1:
+      st.text(f"Applications Dataset: {st.session_state.applications_entry.name}")
+    with col2:
+      def temp():
+        applications_entry = None
+      st.button(label = "Upload New Applications Dataset", on_click = temp)
   responses_entry = st.file_uploader(label = "Upload the responses dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "responses_entry")
 
 def osbg_letters_to_nums(letters):
