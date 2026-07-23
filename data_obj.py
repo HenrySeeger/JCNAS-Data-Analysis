@@ -18,21 +18,41 @@ with st.expander(label = "Upload Datasets"):
   # If at least one is missing the master DataObject is set to None.
   def master_data_uploaders_on_change():
     if (st.session_state.applications_entry is not None and st.session_state.responses_entry is not None):
+      st.session_state.applications_entry.seek(0)
+      st.session_state.responses_entry.seek(0)
       st.session_state.master_data = do.DataObject("Master", pd.read_csv(st.session_state.applications_entry), pd.read_csv(st.session_state.responses_entry))
     else:
       st.session_state.master_data = None
   
-  if st.session_state.applications_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
-    applications_entry = st.file_uploader(label = "Upload the applications dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "applications_entry") 
+  if "applications_entry" not in st.session_state or st.session_state.applications_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
+    st.session_state.applications_entry = st.file_uploader(label = "Upload the applications dataset", max_upload_size = 2000) 
+    if st.session_state.applications_entry is not None:
+      master_data_uploaders_on_change()
+      st.rerun()
   else:
     col1, col2 = st.columns(2)
     with col1:
       st.text(f"Applications Dataset: {st.session_state.applications_entry.name}")
     with col2:
-      def temp():
-        applications_entry = None
-      st.button(label = "Upload New Applications Dataset", on_click = temp)
-  responses_entry = st.file_uploader(label = "Upload the responses dataset", max_upload_size = 2000, on_change = master_data_uploaders_on_change, key = "responses_entry")
+      if st.button(label = "Upload New Applications Dataset"):
+        st.session_state.applications_entry = None
+        master_data_uploaders_on_change()
+        st.rerun()
+
+  
+  if "responses_entry" not in st.session_state or st.session_state.responses_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
+    st.session_state.responses_entry = st.file_uploader(label = "Upload the responses dataset", max_upload_size = 2000)
+    if st.session_state.responses_entry is not None:
+      master_data_uploaders_on_change()
+      st.rerun()
+  else:
+    col1, col2 = st.columns(2)
+    with col1:
+      st.text(f"Responses Dataset: {st.session_state.responses_entry.name}")
+    with col2:
+      if st.button(label = "Upload New Responses Dataset"):
+        st.session_state.responses_entry = None
+        master_data_uploaders_on_change()
 
 def osbg_letters_to_nums(letters):
   """
@@ -80,7 +100,7 @@ def jcnas_to_osbg(coords):
   return lat, lon
 
 with st.expander(label = "Create a Data Object"):
-  creation_name_input = st.text_input(label = "Name", key = "DataObjectName", placeholder = "Enter data object name", disabled = applications_entry is None or responses_entry is None)
+  creation_name_input = st.text_input(label = "Name", key = "DataObjectName", placeholder = "Enter data object name", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None)
   
   # Creates a new DataObject with deep copies of the the master DataObject's datasets if the provided name isn't already being used.
   # The user is alerted as to the success or failure of creating a new DataObject
@@ -92,7 +112,7 @@ with st.expander(label = "Create a Data Object"):
     else:
       st.toast(body = f"'{creation_name_input}' is the name of an existing DataObject")
 
-  obj_creation_button = st.button(label = "Create Object", disabled = applications_entry is None or responses_entry is None, on_click = creation_button_on_click)
+  obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None, on_click = creation_button_on_click)
 
 with st.expander(label = "Manage Data Objects"):
   def data_manager_formatting(data):
@@ -100,11 +120,11 @@ with st.expander(label = "Manage Data Objects"):
   data_manager_data_selector = st.selectbox(label = "Select a data object",
                                             options = ["No Selection", "option2"] + st.session_state.data_objects,
                                             format_func = data_manager_formatting,
-                                            disabled = applications_entry is None or responses_entry is None)
+                                            disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None)
   
   data_manager_options = st.selectbox(label = "Manage Options",
                                       options = ["No Selection", "Delete", "Rename"],
-                                      disabled = applications_entry is None or responses_entry is None or data_manager_data_selector == "No Selection")
+                                      disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or data_manager_data_selector == "No Selection")
 
   if data_manager_data_selector != "No Selection":
     match data_manager_options:
@@ -139,8 +159,8 @@ with st.expander(label = "View Datasets"):
     data_viewer_selection = st.selectbox(label = "Select a dataset to view",
                                          options = ["No Selection"] + [data for obj in st.session_state.data_objects + [st.session_state.master_data] for data in [{"name" : f"{obj.name}: applications", "data" : obj.applications}, {"name" : f"{obj.name}: responses", "data" : obj.responses}]],
                                          format_func = data_viewer_formatting, key = "DataViewerSelecter",
-                                         disabled = applications_entry is None and responses_entry is None)
+                                         disabled = st.session_state.applications_entry is None and st.session_state.responses_entry is None)
     if data_viewer_selection != "No Selection":
       st.dataframe(data_viewer_selection["data"])
   else:
-    st.text("Both an applications dataset and a responses dataset are required to be uploaded before any datsetsa can be viewed")
+    st.text("Both an applications dataset and a responses dataset are required to be uploaded before any dataset can be viewed")
