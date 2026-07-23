@@ -17,8 +17,9 @@ with st.expander(label = "Upload Datasets"):
   # If both the applications and responses datasets have been uploaded, create the master DataObject from them.
   # If at least one is missing the master DataObject is set to None.
   def master_data_uploaders_on_change():
-    print(f"{st.session_state.applications_entry is not None} and {st.session_state.responses_entry is not None} -> {st.session_state.applications_entry is not None and st.session_state.responses_entry is not None}")
     if (st.session_state.applications_entry is not None and st.session_state.responses_entry is not None):
+      st.session_state.applications_entry.seek(0)
+      st.session_state.responses_entry.seek(0)
       st.session_state.master_data = do.DataObject("Master", pd.read_csv(st.session_state.applications_entry), pd.read_csv(st.session_state.responses_entry))
     else:
       st.session_state.master_data = None
@@ -33,10 +34,11 @@ with st.expander(label = "Upload Datasets"):
     with col1:
       st.text(f"Applications Dataset: {st.session_state.applications_entry.name}")
     with col2:
-      def temp():
+      if st.button(label = "Upload New Applications Dataset"):
         st.session_state.applications_entry = None
         master_data_uploaders_on_change()
-      st.button(label = "Upload New Applications Dataset", on_click = temp)
+        st.rerun()
+
   
   if "responses_entry" not in st.session_state or st.session_state.responses_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
     st.session_state.responses_entry = st.file_uploader(label = "Upload the responses dataset", max_upload_size = 2000)
@@ -48,10 +50,9 @@ with st.expander(label = "Upload Datasets"):
     with col1:
       st.text(f"Responses Dataset: {st.session_state.responses_entry.name}")
     with col2:
-      def temp():
+      if st.button(label = "Upload New Responses Dataset"):
         st.session_state.responses_entry = None
         master_data_uploaders_on_change()
-      st.button(label = "Upload New Responses Dataset", on_click = temp)
 
 def osbg_letters_to_nums(letters):
   """
@@ -163,4 +164,3 @@ with st.expander(label = "View Datasets"):
       st.dataframe(data_viewer_selection["data"])
   else:
     st.text("Both an applications dataset and a responses dataset are required to be uploaded before any dataset can be viewed")
-    st.text(st.session_state.master_data)
