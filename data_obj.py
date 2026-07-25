@@ -2,7 +2,7 @@ import copy
 import numpy as np
 import pandas as pd
 import streamlit as st
-import DataObject as do
+import DataObject as d
 from pyproj import Transformer
 import matplotlib.pyplot as plt
 
@@ -20,7 +20,7 @@ with st.expander(label = "Upload Datasets"):
     if (st.session_state.applications_entry is not None and st.session_state.responses_entry is not None):
       st.session_state.applications_entry.seek(0)
       st.session_state.responses_entry.seek(0)
-      st.session_state.master_data = do.DataObject("Master", pd.read_csv(st.session_state.applications_entry), pd.read_csv(st.session_state.responses_entry))
+      st.session_state.master_data = d.DataObject("Master", pd.read_csv(st.session_state.applications_entry), pd.read_csv(st.session_state.responses_entry))
     else:
       st.session_state.master_data = None
   
@@ -107,7 +107,7 @@ with st.expander(label = "Create a Data Object"):
   def creation_button_on_click():
     st.session_state.DataObjectName = ""
     if creation_name_input not in [obj.name for obj in st.session_state.data_objects]:
-      st.session_state.data_objects.append(do.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
+      st.session_state.data_objects.append(d.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
       st.toast(body = f"DataObject '{creation_name_input}' successfully created")
     else:
       st.toast(body = f"'{creation_name_input}' is the name of an existing DataObject")
@@ -118,7 +118,7 @@ with st.expander(label = "Manage Data Objects"):
   def data_manager_formatting(data):
     return data if type(data) == str else data.name
   data_manager_data_selector = st.selectbox(label = "Select a data object",
-                                            options = ["No Selection", "option2"] + st.session_state.data_objects,
+                                            options = ["No Selection"] + st.session_state.data_objects,
                                             format_func = data_manager_formatting,
                                             disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None)
   

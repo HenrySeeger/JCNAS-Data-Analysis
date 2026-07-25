@@ -1,11 +1,23 @@
 import copy
 import pandas as pd
 
+def datesToDatetime(df, sample_size = 10, threshold = 3):
+  for key in df.keys():
+    if type(df[key].dtype) == pd.StringDtype:
+      sample = df[key].dropna().iloc[:sample_size]
+      if len(sample) == 0:
+        continue
+      converted = pd.to_datetime(sample, format = "%Y-%m-%d", errors = "coerce")
+      success_rate = converted.notna().mean()
+      if success_rate >= threshold / sample_size:
+        df[key] = pd.to_datetime(df[key], format = "%Y-%m-%d", errors = "coerce")
+  return df
+
 class DataObject:
   def __init__(self, name, applications, responses):
     self.name = name
-    self.applications = applications
-    self.responses = responses
+    self.applications = datesToDatetime(applications)
+    self.responses = datesToDatetime(responses)
     self.filter_history = [] # Each element{"filter_code":filtration_type_code, "dataset":dataset, "column":column, "arg1":arg1, "arg2":arg2, etc}
   
   @classmethod
