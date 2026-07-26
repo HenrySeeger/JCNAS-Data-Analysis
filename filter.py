@@ -43,13 +43,26 @@ with st.expander(label = "Filtering"):
     filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object == "Select a Data Object")
 
   if filter_col not in [None, "Select a Column"]:
-    col_var_type = type(filter_data_object.key_owner(filter_col)[0].dtypes[filter_col])
-    if col_var_type == pd.StringDtype:
-      st.text("string")
-    elif col_var_type == np.dtypes.Int64DType:
-      st.text("int")
-    elif col_var_type == np.dtypes.DateTime64DType:
-      st.text("date")
+    for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", vertical_alignment = "center", border = False)):
+      with col:
+        if i == 0:   
+          st.toggle(label = "Inlcude", key = "FilterToggle", label_visibility = "collapsed")
+        else:
+          st.text("Exclude" if st.session_state.FilterToggle else "Include")
+
+    match type(filter_data_object.key_owner(filter_col)[0].dtypes[filter_col]):
+      case pd.StringDtype:
+        st.text("string")
+      case np.dtypes.Int64DType:
+        # st.text("int")
+        for i, tab in enumerate(st.tabs(tabs = ["Select Bounds", "Individual Values"])):
+          with tab:
+            if i == 0:
+              st.text("0")
+            else:
+              st.text("1")
+      case np.dtypes.DateTime64DType:
+        st.text("date")
 
 with st.expander(label = "Merging"):
   st.text("stuff")
