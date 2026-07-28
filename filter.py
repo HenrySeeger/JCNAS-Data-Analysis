@@ -43,12 +43,12 @@ with st.expander(label = "Filtering"):
     filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object == "Select a Data Object")
 
   if filter_col not in [None, "Select a Column"]:
-    for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", vertical_alignment = "center", border = False)):
+    for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
       with col:
         if i == 0:   
-          st.toggle(label = "Inlcude", key = "FilterToggle", label_visibility = "collapsed")
+          st.toggle(label = "Inlcude", key = "FilterToggle", value = True, label_visibility = "collapsed")
         else:
-          st.text("Exclude" if st.session_state.FilterToggle else "Include")
+          st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterToggle else "Exclude"}</div>", unsafe_allow_html = True)
 
     match type(filter_data_object.key_owner(filter_col)[0].dtypes[filter_col]):
       case pd.StringDtype:
@@ -58,9 +58,17 @@ with st.expander(label = "Filtering"):
         for i, tab in enumerate(st.tabs(tabs = ["Select Bounds", "Individual Values"])):
           with tab:
             if i == 0:
-              st.text("0")
+              col1, col2, col3, col4 = st.columns([1, 2.5, 1, 2.5], gap = None)
+              with col1:
+                st.markdown("<div style='padding-top: 8px;'>Lower Bound</div>", unsafe_allow_html = True)
+              with col2:
+                int_lower = st.number_input(label = "Lower Bound", label_visibility = "collapsed", width = 200)
+              with col3:
+                st.markdown("<div style='padding-top: 8px;'>Upper Bound</div>", unsafe_allow_html = True)
+              with col4:
+                int_upper = st.number_input(label = "Upper Bound", label_visibility = "collapsed", width = 200)
             else:
-              st.text("1")
+              st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .")
       case np.dtypes.DateTime64DType:
         st.text("date")
 
