@@ -13,7 +13,7 @@ OSGB36_to_WGS84_transformer = Transformer.from_crs("EPSG:27700", "EPSG:4326", al
 
 st.header("Managing Data Objects")
 
-with st.expander(label = "Upload Datasets"):
+with st.expander(label = "Upload Datasets", expanded = True):
   # If both the applications and responses datasets have been uploaded, create the master DataObject from them.
   # If at least one is missing the master DataObject is set to None.
   def master_data_uploaders_on_change():
