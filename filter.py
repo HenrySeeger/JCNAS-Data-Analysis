@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 
 st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("filter_state", None)
-# st.session_state.setdefault("IntFilterTabs", "a")
 
 st.header("Cleaning, Filtering, & Merging")
 
@@ -45,52 +44,60 @@ with st.expander(label = "Filtering"):
     filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object == "Select a Data Object")
 
   if filter_col not in [None, "Select a Column"]:
-    for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
+    for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
       with col:
-        if i == 0:   
-          st.toggle(label = "Inlcude", key = "FilterToggle", value = True, label_visibility = "collapsed")
+        if i == 0:
+          st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = True, label_visibility = "collapsed")
+        elif i == 1:
+          st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+        elif i == 2:
+          st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = True, label_visibility = "collapsed")
         else:
-          st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterToggle else "Exclude"}</div>", unsafe_allow_html = True)
+          st.markdown(f"<div style='padding-top: 9.5px;'>{"Keep" if st.session_state.FilterNoneToggle else "Remove"} Empty Values</div>", unsafe_allow_html = True)
 
+    disable_button = True
+    filter_function = None
     match type(filter_data_object.key_owner(filter_col)[0].dtypes[filter_col]):
       case pd.StringDtype:
         st.text("string")
+
       case np.dtypes.Int64DType:
-        disable_button = True
-        # for i, tab in enumerate(st.tabs(tabs = ["Select Bounds", "Individual Values"])):
-        #   with tab:
-        #     if i == 0:
-        #       col1, col2, col3, col4 = st.columns([1, 2.5, 1, 2.5], gap = None)
-        #       with col1:
-        #         st.markdown("<div style='padding-top: 8px;'>Lower Bound</div>", unsafe_allow_html = True)
-        #       with col2:
-        #         int_lower = st.number_input(label = "Lower Bound", label_visibility = "collapsed", width = 200, value = None)
-        #       with col3:
-        #         st.markdown("<div style='padding-top: 8px;'>Upper Bound</div>", unsafe_allow_html = True)
-        #       with col4:
-        #         int_upper = st.number_input(label = "Upper Bound", label_visibility = "collapsed", width = 200, value = None)
-        #       disable_button = int_lower is None and int_upper is None
-        #       print(disable_button)
-        #     else:
-        #       int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = None)
-        #       try:
-        #         [int(val) for val in int_area.replace(" ", "").split(",")]
-        #         disable_button = False
-        #       except:
-        #         disable_button = True
-        # IntFilterBounds, IntFilterList = st.tabs(tabs = ["Select Bounds", "Individual Values"])
         int_tabs = st.segmented_control(label = "int_tabs", options = ["Select Bounds", "Individual Values"], default = "Select Bounds", selection_mode = "single", label_visibility = "collapsed")
+
         if int_tabs == "Select Bounds":
           col1, col2, col3, col4 = st.columns([1, 2.5, 1, 2.5], gap = None)
           with col1:
             st.markdown("<div style='padding-top: 8px;'>Lower Bound</div>", unsafe_allow_html = True)
           with col2:
-            int_lower = st.number_input(label = "Lower Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
+            int_lower_bound = st.number_input(label = "Lower Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
           with col3:
             st.markdown("<div style='padding-top: 8px;'>Upper Bound</div>", unsafe_allow_html = True)
           with col4:
-            int_upper = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
-          disable_button = int_lower is None and int_upper is None
+            int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
+          disable_button = int_lower_bound is None and int_upper_bound is None
+
+          def int_bounds_filter():          
+            # data_object = filter_data_object
+            dataset = filter_data_object.key_owner(filter_col)[0]
+            column = dataset[filter_col]
+            # int_label.value = f"Applying integer bound{"s" if int_use_lower_indicator.value and int_use_upper_indicator.value else ""}..."
+            if st.session_state.FilterInclusionToggle:
+              mask = pd.Series(True, index = column.index)
+              if int_upper_bound:
+                mask &= column <= int_upper_bound
+              if int_lower_bound:
+                mask &= column >= int_lower_bound
+            else:
+              mask = pd.Series(False, index = column.index)
+              if int_upper_bound:
+                mask |= column > int_upper_bound
+              if int_lower_bound:
+                mask |= column < int_lower_bound
+            if st.session_state.FilterNoneToggle:
+              mask |= column.isna()
+            filter_data_object.key_owner(filter_col)[0] = dataset[mask]
+          filter_function = int_bounds_filter
+
         elif int_tabs == "Individual Values":
           int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "")
           try:
@@ -102,10 +109,10 @@ with st.expander(label = "Filtering"):
             elif int_area not in [None, ""]:
               st.markdown(":red[Only integers are allowed here.]")
             disable_button = True
-        # st.text(f"(({int_tabs == "Select Bounds"} and ({int_lower is not None} or {int_upper is not None})) or ({int_tabs == "Individual Values"} and {int_area not in [None, ""]})")
-        st.button(label = "Filter", disabled = disable_button)
+
       case np.dtypes.DateTime64DType:
         st.text("date")
+    st.button(label = "Filter", disabled = disable_button, on_click = filter_function)
 
 with st.expander(label = "Merging"):
   st.text("stuff")
