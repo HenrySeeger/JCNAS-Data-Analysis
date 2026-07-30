@@ -35,13 +35,14 @@ with st.expander(label = "Cleaning"):
 with st.expander(label = "Filtering"):
   filter_data_object_column, filter_col_column = st.columns(2)
   with filter_data_object_column:
-    def filter_select_format(data):
-      return data if type(data) == str else data.name
-    filter_data_object = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + st.session_state.data_objects, format_func = filter_select_format, label_visibility = "collapsed")
+    def filter_select_format(num):
+      return num if type(num) == str else st.session_state.data_objects[num].name
+    # filter_data_object = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + st.session_state.data_objects, format_func = filter_select_format, label_visibility = "collapsed")
+    filter_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), format_func = filter_select_format, label_visibility = "collapsed")
 
   with filter_col_column:
-    options = ["Select a Column"] + ([] if filter_data_object == "Select a Data Object" else sorted(set(list(filter_data_object.applications.keys()) + list(filter_data_object.responses.keys()))))
-    filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object == "Select a Data Object")
+    options = ["Select a Column"] + ([] if filter_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[filter_data_object_index].applications.keys()) + list(st.session_state.data_objects[filter_data_object_index].responses.keys()))))
+    filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object_index == "Select a Data Object")
 
   if filter_col not in [None, "Select a Column"]:
     for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
@@ -57,7 +58,7 @@ with st.expander(label = "Filtering"):
 
     disable_button = True
     filter_function = None
-    match type(filter_data_object.key_owner(filter_col)[0].dtypes[filter_col]):
+    match type(st.session_state.data_objects[filter_data_object_index].key_owner(filter_col).dtypes[filter_col]):
       case pd.StringDtype:
         st.text("string")
 
@@ -76,11 +77,9 @@ with st.expander(label = "Filtering"):
             int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
           disable_button = int_lower_bound is None and int_upper_bound is None
 
-          def int_bounds_filter():          
-            # data_object = filter_data_object
-            dataset = filter_data_object.key_owner(filter_col)[0]
-            column = dataset[filter_col]
-            # int_label.value = f"Applying integer bound{"s" if int_use_lower_indicator.value and int_use_upper_indicator.value else ""}..."
+          def int_bounds_filter():
+            dataset = st.session_state.data_objects[filter_data_object_index]
+            column = dataset.key_owner(filter_col)[filter_col]
             if st.session_state.FilterInclusionToggle:
               mask = pd.Series(True, index = column.index)
               if int_upper_bound:
@@ -95,7 +94,7 @@ with st.expander(label = "Filtering"):
                 mask |= column < int_lower_bound
             if st.session_state.FilterNoneToggle:
               mask |= column.isna()
-            filter_data_object.key_owner(filter_col)[0] = dataset[mask]
+            dataset.filter_owner(filter_col, mask, "int_bound", dataset.key_owner_name(filter_col), filter_col, int_lower_bound = int_lower_bound, int_upper_bound = int_upper_bound)
           filter_function = int_bounds_filter
 
         elif int_tabs == "Individual Values":

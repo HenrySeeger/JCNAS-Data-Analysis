@@ -26,20 +26,46 @@ class DataObject:
 
   def key_owner(self, key) -> list:
     """
-    Takes a key and produces a list of all the contained datasets with the owner in the 0 index position. Checks the applications dataset first.
+    Takes a key and produces the owner of the key. Checks the applications dataset first.
 
     Args:
       key (Any): The key to be matched to a dataset
     
     Returns:
-      list (pandas.DataFrame): A list with the owner dataset in the first position
+      pandas.DataFrame: The owner dataset
     """
     if key in self.applications:
-      return [self.applications, self.responses]
+      return self.applications
     elif key in self.responses:
-      return [self.responses, self.applications]
+      return self.responses
     else:
       raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
+
+  def key_owner_name(self, key) -> list:
+    """
+    Takes a key and produces the owner of the key. Checks the applications dataset first.
+
+    Args:
+      key (Any): The key to be matched to a dataset
+    
+    Returns:
+      pandas.DataFrame: The owner dataset
+    """
+    if key in self.applications:
+      return "applications"
+    elif key in self.responses:
+      return "responses"
+    else:
+      raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
+
+  def filter_owner(self, key, mask, *args, **kwargs): # NEED TO FILTER OTHER DATASET AS WELL, FILTER HISTORY
+    self.filter_history.append({"filter_code" : args[0], "dataset" : args[1], "column" : args[2]} | kwargs)
+    if self.key_owner_name(key) == "applications":
+      self.applications = self.applications[mask]
+    else:
+      self.responses = self.responses[mask]
+    print(self.filter_history)
+
   
   def add_filter_history(self, dataset: str, column: any, **kwargs) -> None:
     """
