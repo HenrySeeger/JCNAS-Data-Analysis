@@ -58,6 +58,7 @@ with st.expander(label = "Filtering"):
 
     disable_button = True
     filter_function = None
+    filter_function_args = None
     match type(st.session_state.data_objects[filter_data_object_index].key_owner(filter_col).dtypes[filter_col]):
       case pd.StringDtype:
         st.text("string")
@@ -70,35 +71,18 @@ with st.expander(label = "Filtering"):
           with col1:
             st.markdown("<div style='padding-top: 8px;'>Lower Bound</div>", unsafe_allow_html = True)
           with col2:
-            int_lower_bound = st.number_input(label = "Lower Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
+            int_lower_bound = st.number_input(label = "Lower Bound", step = 1, label_visibility = "collapsed", key = "IntLowerBound", width = 200, value = None)
           with col3:
             st.markdown("<div style='padding-top: 8px;'>Upper Bound</div>", unsafe_allow_html = True)
           with col4:
-            int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", width = 200, value = None)
-          disable_button = int_lower_bound is None and int_upper_bound is None
+            int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", key = "IntUpperBound", width = 200, value = None)
 
-          def int_bounds_filter():
-            dataset = st.session_state.data_objects[filter_data_object_index]
-            column = dataset.key_owner(filter_col)[filter_col]
-            if st.session_state.FilterInclusionToggle:
-              mask = pd.Series(True, index = column.index)
-              if int_upper_bound:
-                mask &= column <= int_upper_bound
-              if int_lower_bound:
-                mask &= column >= int_lower_bound
-            else:
-              mask = pd.Series(False, index = column.index)
-              if int_upper_bound:
-                mask |= column > int_upper_bound
-              if int_lower_bound:
-                mask |= column < int_lower_bound
-            if st.session_state.FilterNoneToggle:
-              mask |= column.isna()
-            dataset.filter_owner(filter_col, mask, "int_bound", dataset.key_owner_name(filter_col), filter_col, int_lower_bound = int_lower_bound, int_upper_bound = int_upper_bound)
-          filter_function = int_bounds_filter
+          disable_button = int_lower_bound is None and int_upper_bound is None
+          filter_function = d.int_bounds_filter
+          filter_function_args = (filter_data_object_index, filter_col, int_lower_bound, int_upper_bound)
 
         elif int_tabs == "Individual Values":
-          int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "")
+          int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
           try:
             a = [int(val) for val in int_area.replace(" ", "").split(",")]
             disable_button = False
@@ -107,11 +91,14 @@ with st.expander(label = "Filtering"):
               st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
             elif int_area not in [None, ""]:
               st.markdown(":red[Only integers are allowed here.]")
+
             disable_button = True
+          filter_function = d.int_values_filter
+          filter_function_args = (filter_data_object_index, filter_col, int_area)
 
       case np.dtypes.DateTime64DType:
         st.text("date")
-    st.button(label = "Filter", disabled = disable_button, on_click = filter_function)
+    st.button(label = "Filter", disabled = disable_button, on_click = filter_function, args = filter_function_args)
 
 with st.expander(label = "Merging"):
   st.text("stuff")

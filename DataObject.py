@@ -1,5 +1,9 @@
 import copy
 import pandas as pd
+import streamlit as st
+
+st.session_state.setdefault("FilterInclusionToggle", None)
+st.session_state.setdefault("FilterNoneToggle", None)
 
 def datesToDatetime(df, sample_size = 10, threshold = 3):
   for key in df.keys():
@@ -59,12 +63,12 @@ class DataObject:
       raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
 
   def filter_owner(self, key, mask, *args, **kwargs): # NEED TO FILTER OTHER DATASET AS WELL, FILTER HISTORY
-    self.filter_history.append({"filter_code" : args[0], "dataset" : args[1], "column" : args[2]} | kwargs)
+    self.filter_history.append({"filter_code" : args[0], "dataset" : args[1], "column" : args[2], "include_values" : args[3], "include_None" : args[4]} | kwargs)
     if self.key_owner_name(key) == "applications":
       self.applications = self.applications[mask]
     else:
       self.responses = self.responses[mask]
-    print(self.filter_history)
+    # print(self.filter_history)
 
   
   def add_filter_history(self, dataset: str, column: any, **kwargs) -> None:
@@ -117,3 +121,42 @@ class DataObject:
     for action in self.filter_history:
       string.append(str(action).replace("'","")[1:-1] + "\n")
     return string[:-1]
+
+def int_bounds_filter(filter_data_object_index, filter_col, *args):
+  st.session_state.IntLowerBound = None
+  st.session_state.IntUpperBound = None
+  int_lower_bound, int_upper_bound = args
+  dataset = st.session_state.data_objects[filter_data_object_index]
+  column = dataset.key_owner(filter_col)[filter_col]
+  if st.session_state.FilterInclusionToggle:
+    mask = pd.Series(True, index = column.index)
+    if int_upper_bound:
+      mask &= column <= int_upper_bound
+    if int_lower_bound:
+      mask &= column >= int_lower_bound
+  else:
+    mask = pd.Series(False, index = column.index)
+    if int_upper_bound:
+      mask |= column > int_upper_bound
+    if int_lower_bound:
+      mask |= column < int_lower_bound
+  if st.session_state.FilterNoneToggle:
+    mask |= column.isna()
+  dataset.filter_owner(filter_col, mask, "int_bound", dataset.key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle, int_lower_bound = int_lower_bound, int_upper_bound = int_upper_bound)
+  st.toast(body = f"'{dataset.name}' successfully filtered")
+
+def int_values_filter(filter_data_object_index, filter_col, *args):
+  st.session_state.IntArea = ""
+  int_area, = args
+  dataset = st.session_state.data_objects[filter_data_object_index]
+  column = dataset.key_owner(filter_col)[filter_col]
+  int_values = [int(num) for num in int_area.replace(" ", "").split(",")]
+  mask = pd.Series(False, index = column.index)
+  if st.session_state.FilterInclusionToggle:
+    mask |= column.isin(int_values)
+  else:
+    mask |= ~column.isin(int_values)
+  if st.session_state.FilterNoneToggle:
+    mask |= column.isna()
+  dataset.filter_owner(filter_col, mask, "int_values", dataset.key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle, int_values = int_values)
+  st.toast(body = f"'{dataset.name}' successfully filtered")
