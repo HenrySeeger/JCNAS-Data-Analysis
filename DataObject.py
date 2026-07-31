@@ -22,7 +22,7 @@ class DataObject:
     self.name = name
     self.applications = datesToDatetime(applications)
     self.responses = datesToDatetime(responses)
-    self.filter_history = [] # Each element{"filter_code":filtration_type_code, "dataset":dataset, "column":column, "arg1":arg1, "arg2":arg2, etc}
+    self.filter_history = [] # Each element in the list is {"filter_code" : filter_code, "dataset" : dataset, "column" : column, "include_values" : include_values, "include_None" : include_none} + additional kwargs
   
   @classmethod
   def from_dataobject(self, name: str, dataobject):
@@ -62,16 +62,21 @@ class DataObject:
     else:
       raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
 
-  def filter_owner(self, key, mask, *args, **kwargs): # NEED TO FILTER OTHER DATASET AS WELL, FILTER HISTORY
-    self.filter_history.append({"filter_code" : args[0], "dataset" : args[1], "column" : args[2], "include_values" : args[3], "include_None" : args[4]} | kwargs)
+  def filter_owner(self, key, mask):
     if self.key_owner_name(key) == "applications":
+      pre_filter_applications = self.applications
       self.applications = self.applications[mask]
+      removed = set(pre_filter_applications["application_id"]) - set(self.applications["application_id"])
+      self.responses = self.responses[~self.responses["application_id"].isin(removed)]
     else:
+      pre_filter_responses = self.responses
       self.responses = self.responses[mask]
+      removed = set(pre_filter_responses["application_id"]) - set(self.responses["application_id"])
+      self.applications = self.applications[~self.applications["application_id"].isin(removed)]
     # print(self.filter_history)
 
   
-  def add_filter_history(self, dataset: str, column: any, **kwargs) -> None:
+  def add_filter_history(self, filter_code: str, dataset, column, include_values: bool, include_none: bool, **kwargs) -> None:
     """
     Updates the DataObject's filtration history. It also updates the other datasets that weren't directly filtered
 
@@ -80,16 +85,7 @@ class DataObject:
       column (any): The name of the column the filter was applied to. Likely a string.
       **kwargs: Any keyword arguments relevent to the method of filtration. Each method will have its own standard format.
     """
-    # match dataset:
-    #   case "applications":
-    #     self.responses = pd.merge(self.applications, self.responses)
-    #   case "responses":
-    #     self.applications = pd.merge(self.applications, self.responses)
-
-    filter = {"dataset" : dataset, "column" : column}
-    for key, val in kwargs.items():
-      filter[key] = val
-    self.filter_history.append(filter)
+    self.filter_history.append({"filter_code" : filter_code, "dataset" : dataset, "column" : column, "include_values" : include_values, "include_None" : include_none} | kwargs)
   
   def undo(self) -> list:
     """
@@ -117,10 +113,8 @@ class DataObject:
       str:
         String representation of the filtration actions recorded in the list
     """
-    string = ""
-    for action in self.filter_history:
-      string.append(str(action).replace("'","")[1:-1] + "\n")
-    return string[:-1]
+    return str(self.filter_history)[1:-1]
+
 
 def int_bounds_filter(filter_data_object_index, filter_col, *args):
   st.session_state.IntLowerBound = None
@@ -142,7 +136,7 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
       mask |= column < int_lower_bound
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
-  dataset.filter_owner(filter_col, mask, "int_bound", dataset.key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle, int_lower_bound = int_lower_bound, int_upper_bound = int_upper_bound)
+  dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def int_values_filter(filter_data_object_index, filter_col, *args):
@@ -158,5 +152,5 @@ def int_values_filter(filter_data_object_index, filter_col, *args):
     mask |= ~column.isin(int_values)
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
-  dataset.filter_owner(filter_col, mask, "int_values", dataset.key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle, int_values = int_values)
+  dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")

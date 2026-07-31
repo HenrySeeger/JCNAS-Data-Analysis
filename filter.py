@@ -79,7 +79,9 @@ with st.expander(label = "Filtering"):
 
           disable_button = int_lower_bound is None and int_upper_bound is None
           filter_function = d.int_bounds_filter
-          filter_function_args = (filter_data_object_index, filter_col, int_lower_bound, int_upper_bound)
+          filter_function_args = ((filter_data_object_index, filter_col, int_lower_bound, int_upper_bound),
+                                  ("int_bound", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle), 
+                                  {"int_lower_bound" : int_lower_bound, "int_upper_bound" : int_upper_bound})
 
         elif int_tabs == "Individual Values":
           int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
@@ -94,11 +96,18 @@ with st.expander(label = "Filtering"):
 
             disable_button = True
           filter_function = d.int_values_filter
-          filter_function_args = (filter_data_object_index, filter_col, int_area)
+          filter_function_args = ((filter_data_object_index, filter_col, int_area),
+                                  ("int_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
+                                  {"int_values" : [int(num) for num in int_area.replace(" ", "").split(",")]})
 
       case np.dtypes.DateTime64DType:
         st.text("date")
-    st.button(label = "Filter", disabled = disable_button, on_click = filter_function, args = filter_function_args)
+
+    def filter_on_click(*args):
+      filter_function(*args[0])
+      st.session_state.data_objects[filter_data_object_index].add_filter_history(*args[1], **args[2])
+
+    st.button(label = "Filter", disabled = disable_button, on_click = filter_on_click, args = filter_function_args)
 
 with st.expander(label = "Merging"):
   st.text("stuff")
