@@ -125,26 +125,26 @@ def string_filter(filter_data_object_index, filter_col, *args):
   string_area, = args
   list_strings = []
 
-  for string in string_area.value.split("|"):
+  for string in string_area.split("|"):
     list_strings.append(string.strip())
     
   mask = pd.Series(False, index = column.index)
-  if st.session_state.FilterInclusionToggle: # A 'True' value actually indicates exclusivity
+  if st.session_state.FilterInclusionToggle: # A 'True' value indicates inclusivity
     if st.session_state.FilterExactStringToggle: # 'True' indicates filtering for the exact string(s), false allows for strings containing a target string
       if st.session_state.FilterCaseSensitivityToggle: # 'True' indicates case-sensitivity, 'False' insensitivity
-        mask |= ~column.isin(list_strings)
-      else:
-        mask |= ~column.str.lower().isin([string.lower() for string in list_strings])
-    else:
-      mask |= ~column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
-  else:
-    if st.session_state.FilterExactStringToggle:
-      if st.session_state.FilterCaseSensitivityToggle:
         mask |= column.isin(list_strings)
       else:
         mask |= column.str.lower().isin([string.lower() for string in list_strings])
     else:
       mask |= column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
+  else:
+    if st.session_state.FilterExactStringToggle:
+      if st.session_state.FilterCaseSensitivityToggle:
+        mask |= ~column.isin(list_strings)
+      else:
+        mask |= ~column.str.lower().isin([string.lower() for string in list_strings])
+    else:
+      mask |= ~column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
 
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()

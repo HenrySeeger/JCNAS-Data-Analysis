@@ -81,7 +81,7 @@ with st.expander(label = "Filtering"):
             else:
               st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.FilterCaseSensitivityToggle else "Insensitive"}</div>", unsafe_allow_html = True)
 
-        string_area = st.text_area(label = "List String(s):", placeholder = "Green|Efficient|Energy", value = "", key = "IntArea")
+        string_area = st.text_area(label = "List String(s):", placeholder = "Green|Efficient|Energy", value = "", key = "FilterStringArea")
 
         disable_button = string_area == ""
         filter_function = d.string_filter
