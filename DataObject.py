@@ -1,3 +1,4 @@
+import re
 import copy
 import pandas as pd
 import streamlit as st
@@ -116,12 +117,48 @@ class DataObject:
     return str(self.filter_history)[1:-1]
 
 
+
+def string_filter(filter_data_object_index, filter_col, *args):
+  dataset = st.session_state.data_objects[filter_data_object_index]
+  column = dataset.key_owner(filter_col)[filter_col]
+  st.session_state.FilterStringArea = ""
+  string_area, = args
+  list_strings = []
+
+  for string in string_area.value.split("|"):
+    list_strings.append(string.strip())
+    
+  mask = pd.Series(False, index = column.index)
+  if st.session_state.FilterInclusionToggle: # A 'True' value actually indicates exclusivity
+    if st.session_state.FilterExactStringToggle: # 'True' indicates filtering for the exact string(s), false allows for strings containing a target string
+      if st.session_state.FilterCaseSensitivityToggle: # 'True' indicates case-sensitivity, 'False' insensitivity
+        mask |= ~column.isin(list_strings)
+      else:
+        mask |= ~column.str.lower().isin([string.lower() for string in list_strings])
+    else:
+      mask |= ~column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
+  else:
+    if st.session_state.FilterExactStringToggle:
+      if st.session_state.FilterCaseSensitivityToggle:
+        mask |= column.isin(list_strings)
+      else:
+        mask |= column.str.lower().isin([string.lower() for string in list_strings])
+    else:
+      mask |= column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
+
+  if st.session_state.FilterNoneToggle:
+    mask |= column.isna()
+
+  dataset.filter_owner(filter_col, mask)
+  st.toast(body = f"'{dataset.name}' successfully filtered")
+
 def int_bounds_filter(filter_data_object_index, filter_col, *args):
+  dataset = st.session_state.data_objects[filter_data_object_index]
+  column = dataset.key_owner(filter_col)[filter_col]
   st.session_state.IntLowerBound = None
   st.session_state.IntUpperBound = None
   int_lower_bound, int_upper_bound = args
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[filter_col]
+
   if st.session_state.FilterInclusionToggle:
     mask = pd.Series(True, index = column.index)
     if int_upper_bound:
@@ -134,23 +171,29 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
       mask |= column > int_upper_bound
     if int_lower_bound:
       mask |= column < int_lower_bound
+
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
+
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def int_values_filter(filter_data_object_index, filter_col, *args):
-  st.session_state.IntArea = ""
-  int_area, = args
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[filter_col]
+  st.session_state.IntArea = ""
+  int_area, = args
   int_values = [int(num) for num in int_area.replace(" ", "").split(",")]
   mask = pd.Series(False, index = column.index)
+
   if st.session_state.FilterInclusionToggle:
     mask |= column.isin(int_values)
   else:
     mask |= ~column.isin(int_values)
+
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
+
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
+
