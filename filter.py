@@ -75,11 +75,11 @@ with st.expander(label = "Filtering"):
             if i == 0:
               st.toggle(label = "Inlcude", key = "FilterExactStringToggle", value = True, label_visibility = "collapsed")
             elif i == 1:
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Contains" if st.session_state.FilterExactStringToggle else "Is Exact"} Word(s)</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Is Exact" if st.session_state.FilterExactStringToggle else "Contains"} Word(s)</div>", unsafe_allow_html = True)
             elif i == 2:
               st.toggle(label = "Inlcude", key = "FilterCaseSensitivityToggle", value = True, label_visibility = "collapsed")
             else:
-              st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Insensitive" if st.session_state.FilterCaseSensitivityToggle else "Sensitive"}</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.FilterCaseSensitivityToggle else "Insensitive"}</div>", unsafe_allow_html = True)
 
         string_area = st.text_area(label = "List String(s):", placeholder = "Green|Efficient|Energy", value = "", key = "IntArea")
 
@@ -118,8 +118,12 @@ with st.expander(label = "Filtering"):
         elif int_tabs == "Individual Values":
           int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
           try:
-            a = [int(val) for val in int_area.replace(" ", "").split(",")]
+            a = [int(val) for val in int_area.replace(" ", "").replace("\n", "").split(",")]
             disable_button = False
+            filter_function = d.int_values_filter
+            filter_function_args = ((filter_data_object_index, filter_col, int_area),
+                                  ("int_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
+                                  {"int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
           except:
             if "." in int_area:
               st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
@@ -127,10 +131,6 @@ with st.expander(label = "Filtering"):
               st.markdown(":red[Only integers are allowed here.]")
 
             disable_button = True
-          filter_function = d.int_values_filter
-          filter_function_args = ((filter_data_object_index, filter_col, int_area),
-                                  ("int_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
-                                  {"int_values" : [int(num) for num in int_area.replace(" ", "").split(",")]})
 
       #* DateTime Variable Type
       case np.dtypes.DateTime64DType:
