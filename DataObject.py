@@ -12,10 +12,19 @@ def datesToDatetime(df, sample_size = 10, threshold = 3):
       sample = df[key].dropna().iloc[:sample_size]
       if len(sample) == 0:
         continue
+      # if "date" in key:
+      #   print(sample)
       converted = pd.to_datetime(sample, format = "%Y-%m-%d", errors = "coerce")
       success_rate = converted.notna().mean()
+      # print(f"{key} : {success_rate}")
       if success_rate >= threshold / sample_size:
         df[key] = pd.to_datetime(df[key], format = "%Y-%m-%d", errors = "coerce")
+      else: #! Delete this part once we get the real datasets form the website, this just handles different formatting from my/your dataset construction
+        converted = pd.to_datetime(sample, format = "%m/%d/%Y", errors = "coerce")
+        success_rate = converted.notna().mean()
+        # print(f"{key} : {success_rate}")
+        if success_rate >= threshold / sample_size:
+          df[key] = pd.to_datetime(df[key], format = "%m/%d/%Y", errors = "coerce")
   return df
 
 class DataObject:
