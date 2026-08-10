@@ -1,3 +1,4 @@
+import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -172,7 +173,46 @@ with st.expander(label = "Filtering"):
 
       #* DateTime Variable Type
       case np.dtypes.DateTime64DType:
-        st.text("date")
+        int_tabs = st.segmented_control(label = "date_tabs", options = ["Select Bounds", "Individual Values"], default = "Select Bounds", selection_mode = "single", label_visibility = "collapsed")
+        
+        #* Earlier and Later Bounds
+        if int_tabs == "Select Date Bounds":
+          col1, col2, col3, col4 = st.columns([1, 2.5, 1, 2.5], gap = None)
+          with col1:
+            st.markdown("<div style='padding-top: 8px;'>Earlier Date</div>", unsafe_allow_html = True)
+          with col2:
+            date_earlier_bound = st.number_input(label = "Earlier Date", step = 1, label_visibility = "collapsed", key = "DateEarlierBound", width = 200, value = None)
+          with col3:
+            st.markdown("<div style='padding-top: 8px;'>Later Date</div>", unsafe_allow_html = True)
+          with col4:
+            date_later_bound = st.number_input(label = "Later Date", step = 1, label_visibility = "collapsed", key = "DateLaterBound", width = 200, value = None)
+
+          disable_button = date_earlier_bound is None and date_later_bound is None
+          if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
+            st.markdown(":red[The lower bound must be less than the upper bound.]")
+
+          filter_function = d.date_bounds_filter
+          filter_function_args = ((filter_data_object_index, filter_col, date_earlier_bound, date_later_bound),
+                                  ("date_bound", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle), 
+                                  {"date_earlier_bound" : date_earlier_bound, "date_later_bound" : date_later_bound})
+
+      #* List of Dates
+        elif int_tabs == "Individual Values": #! Need to update this int -> date
+          date_area = st.text_area(label = "List Dates:", placeholder = "2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
+          try:
+            a = [int(val) for val in date_area.replace(" ", "").replace("\n", "").split(",")]
+            disable_button = False
+            filter_function = d.date_values_filter
+            filter_function_args = ((filter_data_object_index, filter_col, date_area),
+                                    ("date_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
+                                    {"date_values" : [int(num) for num in date_area.replace(" ", "").replace("\n", "").split(",")]})
+          except:
+            if "." in date_area:
+              st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
+            elif date_area not in [None, ""]:
+              st.markdown(":red[Only integers are allowed here.]")
+      
+            disable_button = True
 
     def filter_on_click(*args):
       """
