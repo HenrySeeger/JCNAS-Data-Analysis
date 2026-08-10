@@ -48,6 +48,7 @@ with st.expander(label = "Filtering"):
     options = ["Select a Column"] + ([] if filter_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[filter_data_object_index].applications.keys()) + list(st.session_state.data_objects[filter_data_object_index].responses.keys()))))
     filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object_index == "Select a Data Object")
 
+  #* Inclusion/Exclusion & None Inclusion toggles
   if filter_col not in [None, "Select a Column"]:
     for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
       with col:

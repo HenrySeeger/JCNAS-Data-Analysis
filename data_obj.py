@@ -110,7 +110,7 @@ with st.expander(label = "Create a Data Object"):
       st.session_state.data_objects.append(d.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
       st.toast(body = f"DataObject '{creation_name_input}' successfully created")
     else:
-      st.toast(body = f"'{creation_name_input}' is the name of an existing DataObject")
+      st.toast(body = f"'{creation_name_input}' could not be created because it is the name of an existing DataObject")
 
   obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None, on_click = creation_button_on_click)
 
@@ -119,33 +119,47 @@ with st.expander(label = "Manage Data Objects"):
     return data if type(data) == str else data.name
   data_manager_data_selector = st.selectbox(label = "Select a data object",
                                             options = ["No Selection"] + st.session_state.data_objects,
+                                            key = "DataManagerDataSelector",
                                             format_func = data_manager_formatting,
                                             disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None)
   
   data_manager_options = st.selectbox(label = "Manage Options",
                                       options = ["No Selection", "Delete", "Rename"],
+                                      key = "DataManagerOptions",
                                       disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or data_manager_data_selector == "No Selection")
 
   if data_manager_data_selector != "No Selection":
     match data_manager_options:
       case "Delete":
-        data_delete_confirmation = st.toggle(label = f"Confirm deletion of {data_manager_data_selector}", value = False)
+        data_delete_confirmation = st.toggle(label = f"Confirm deletion of {data_manager_data_selector.name}", value = False)
 
-        def delete_data(data):
-          print("temp")
-          # Add an st.toast() declaring success or failure
-        data_delete_button = st.button(f"Delete {data_manager_data_selector}", disabled = not data_delete_confirmation, on_click = delete_data)
+        def delete_data():
+          for i, obj in enumerate(st.session_state.data_objects):
+            if obj.name == st.session_state.DataManagerDataSelector.name:
+              st.session_state.data_objects.pop(i)
+              break
+          
+          st.session_state.DataManagerDataSelector = "No Selection"
+          st.session_state.DataManagerOptions = "No Selection"
+          st.toast(body = "DataObject Successfully Deleted")
+
+        data_delete_button = st.button(f"Delete {data_manager_data_selector.name}", disabled = not data_delete_confirmation, on_click = delete_data)
       case "Rename":
-        def rename_data(data):
-          print("temp")
-          # Add an st.toast() declaring success or failure
-        data_new_name_text = st.text_input(label = "Enter New Name:")
-        if data_new_name_text != "":
-          st.text(f"Rename '{data_manager_data_selector}' to '{data_new_name_text}'")
-          st.button(label = "Rename")
+        data_new_name_text = st.text_input(label = "Enter New Name:", key = "DataNewNameText")
+        if data_new_name_text in [obj.name for obj in st.session_state.data_objects]:
+          st.markdown(":red[The new name cannot be the name of an existing DataObject]")
+        elif data_new_name_text != "":
+          def rename_data(old_name):
+            for i in range(len(st.session_state.data_objects)):
+              if old_name == st.session_state.DataManagerDataSelector.name:
+                st.session_state.data_objects[i].name = st.session_state.DataNewNameText
+                break
+            st.toast(f"Renamed '{old_name}' to '{st.session_state.DataNewNameText}'")
+            st.session_state.DataManagerDataSelector = "No Selection"
+            st.session_state.DataManagerOptions = "No Selection"
+          st.button(label = "Rename", on_click = rename_data, args = (data_manager_data_selector.name,))
   else:
     data_manager_options = "No Selection"
-    st.text(data_manager_options)
 
 
 with st.expander(label = "View Datasets"):
