@@ -9,28 +9,65 @@ st.session_state.setdefault("filter_state", None)
 
 st.header("Cleaning, Filtering, & Merging")
 
+#* Cleaning Section
 with st.expander(label = "Cleaning"):
   cleaning_data_object_column, cleaning_col_column = st.columns(2)
   with cleaning_data_object_column:
-    cleaning_data_object = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object", "option2"], label_visibility = "collapsed")
+    def clean_select_format(num):
+      return num if type(num) == str else st.session_state.data_objects[num].name
+    cleaning_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), key = "CleaningDataObject", format_func = clean_select_format, label_visibility = "collapsed")
   with cleaning_col_column:
-    cleaning_col = st.selectbox(label = "Select a Column", options = ["Select a Column", "option2"], label_visibility = "collapsed", disabled = cleaning_data_object == "Select a Data Object")
+    options = ["Select a Column"] + ([] if cleaning_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[cleaning_data_object_index].applications.keys()) + list(st.session_state.data_objects[cleaning_data_object_index].responses.keys()))))
+    cleaning_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "CleaningColumn", disabled = cleaning_data_object_index == "Select a Data Object")
   
   if cleaning_col != "Select a Column":
     tab_duplicates, tab_replace, tab_remove_col = st.tabs(["Remove Duplicates", "Replace/Remove Applications", "Remove a Column"])
 
+    #* Remove Duplicates
     with tab_duplicates:
+      def remove_duplicates():
+        global cleaning_col
+        match (cleaning_col in st.session_state.data_objects[cleaning_data_object_index].applications.keys(), cleaning_col in st.session_state.data_objects[cleaning_data_object_index].responses.key()):
+          case (True, False): # column in applications dataset
+            initial = len(st.session_state.data_objects[cleaning_data_object_index].applications)
+            st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col)
+            st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].applications)} duplicate values")
+            st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "applications", cleaning_col, True, True)
+          case (False, True): # column in responses dataset
+            initial = len(st.session_state.data_objects[cleaning_data_object_index].responses)
+            st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col)
+            st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].responses)} duplicate values")
+            st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "responses", cleaning_col, True, True)
+          case (True, True): # column in both datasets
+            st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "both", cleaning_col, True, True)
+        cleaning_col = "Select a Column"
+
       st.button(label = "Remove Duplicates")
-    
+
+    #* Replace Values
     with tab_replace:
       st.checkbox(label = "Check the box to replace NaN and None values")
       st.checkbox(label = "Check the box to remove rows with the indicated value instead of replacing them")
       st.button(label = "Replace Value")
-    
+
+    #* Delete a Column
     with tab_remove_col:
       data_delete_confirmation = st.toggle(label = f"Confirm removal of {cleaning_col}", value = False)
-      # data_delete_button = st.button(f"Delete {data_manager_data_selector}", disabled = not data_delete_confirmation, on_click = delete_data)
-      st.button(f"Remove '{cleaning_col}' from '{cleaning_data_object}'", disabled = not data_delete_confirmation)
+
+      def delete_column():
+        global cleaning_col
+        if cleaning_col in st.session_state.data_objects[cleaning_data_object_index].applications.keys():
+          st.session_state.data_objects[cleaning_data_object_index].applications.drop(columns = cleaning_col, inplace = True)
+        if cleaning_col in st.session_state.data_objects[cleaning_data_object_index].responses.keys():
+          st.session_state.data_objects[cleaning_data_object_index].responses.drop(columns = cleaning_col, inplace = True)
+
+        st.session_state.data_objects[cleaning_data_object_index].add_filter_history("deletion", "both", cleaning_col, True, True)
+        st.toast(body = f"Successfully removed '{"address"}' from '{st.session_state.data_objects[cleaning_data_object_index].name}'")
+        cleaning_col = "Select a Column"
+
+      st.button(f"Remove '{cleaning_col}' from '{st.session_state.data_objects[cleaning_data_object_index].name}'", on_click = delete_column, disabled = not data_delete_confirmation)
 
 #* Filtration Expander Section
 with st.expander(label = "Filtering"):
@@ -41,12 +78,12 @@ with st.expander(label = "Filtering"):
     def filter_select_format(num):
       return num if type(num) == str else st.session_state.data_objects[num].name
     # filter_data_object = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + st.session_state.data_objects, format_func = filter_select_format, label_visibility = "collapsed")
-    filter_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), format_func = filter_select_format, label_visibility = "collapsed")
+    filter_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), key = "FilterDataObject", format_func = filter_select_format, label_visibility = "collapsed")
 
   #* Data Object Column Selector 
   with filter_col_column:
     options = ["Select a Column"] + ([] if filter_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[filter_data_object_index].applications.keys()) + list(st.session_state.data_objects[filter_data_object_index].responses.keys()))))
-    filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", disabled = filter_data_object_index == "Select a Data Object")
+    filter_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "FilterColumn", disabled = filter_data_object_index == "Select a Data Object")
 
   #* Inclusion/Exclusion & None Inclusion toggles
   if filter_col not in [None, "Select a Column"]:

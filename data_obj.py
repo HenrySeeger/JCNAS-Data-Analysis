@@ -121,12 +121,12 @@ with st.expander(label = "Manage Data Objects"):
                                             options = ["No Selection"] + st.session_state.data_objects,
                                             key = "DataManagerDataSelector",
                                             format_func = data_manager_formatting,
-                                            disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None)
+                                            disabled = len(st.session_state.data_objects) == 0)
   
   data_manager_options = st.selectbox(label = "Manage Options",
                                       options = ["No Selection", "Delete", "Rename"],
                                       key = "DataManagerOptions",
-                                      disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or data_manager_data_selector == "No Selection")
+                                      disabled = len(st.session_state.data_objects) == 0 or data_manager_data_selector == "No Selection")
 
   if data_manager_data_selector != "No Selection":
     match data_manager_options:
