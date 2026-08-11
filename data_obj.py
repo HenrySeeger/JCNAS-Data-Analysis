@@ -24,7 +24,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
     else:
       st.session_state.master_data = None
   
-  if "applications_entry" not in st.session_state or st.session_state.applications_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
+  if "applications_entry" not in st.session_state or st.session_state.applications_entry is None:
     st.session_state.applications_entry = st.file_uploader(label = "Upload the applications dataset", max_upload_size = 2000) 
     if st.session_state.applications_entry is not None:
       master_data_uploaders_on_change()
@@ -39,8 +39,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
         master_data_uploaders_on_change()
         st.rerun()
 
-  
-  if "responses_entry" not in st.session_state or st.session_state.responses_entry is None: # REMOVE THE KEY FROM THE FILE_UPLOADER, SET A SESSION STATE EQUAL TO ITS OUTPUT
+  if "responses_entry" not in st.session_state or st.session_state.responses_entry is None:
     st.session_state.responses_entry = st.file_uploader(label = "Upload the responses dataset", max_upload_size = 2000)
     if st.session_state.responses_entry is not None:
       master_data_uploaders_on_change()
@@ -53,6 +52,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
       if st.button(label = "Upload New Responses Dataset"):
         st.session_state.responses_entry = None
         master_data_uploaders_on_change()
+        st.rerun()
 
 def osbg_letters_to_nums(letters):
   """
@@ -160,7 +160,6 @@ with st.expander(label = "Manage Data Objects"):
           st.button(label = "Rename", on_click = rename_data, args = (data_manager_data_selector.name,))
   else:
     data_manager_options = "No Selection"
-
 
 with st.expander(label = "View Datasets"):
   # Lets the user directly view (but not edit) the datasets of any DataObjects created, as well the master DataObject
