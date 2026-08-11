@@ -132,11 +132,11 @@ def string_filter(filter_data_object_index, filter_col, *args):
   st.session_state.FilterStringArea = ""
   string_area, = args
   list_strings = []
+  mask = pd.Series(False, index = column.index)
 
   for string in string_area.split("|"):
     list_strings.append(string.strip())
-    
-  mask = pd.Series(False, index = column.index)
+
   if st.session_state.FilterInclusionToggle: # A 'True' value indicates inclusivity
     if st.session_state.FilterExactStringToggle: # 'True' indicates filtering for the exact string(s), false allows for strings containing a target string
       if st.session_state.FilterCaseSensitivityToggle: # 'True' indicates case-sensitivity, 'False' insensitivity
@@ -208,8 +208,8 @@ def int_values_filter(filter_data_object_index, filter_col, *args):
 def date_bounds_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[filter_col]
-  st.session_state.DateLowerBound = None
-  st.session_state.DateUpperBound = None
+  st.session_state.DateEarlierBound = None
+  st.session_state.DateLaterBound = None
   date_earlier_bound, date_later_bound = args
 
   date_earlier_timestamp = pd.Timestamp(f"{str(date_earlier_bound.year).zfill(4)}-{str(date_earlier_bound.month).zfill(2)}-{str(date_earlier_bound.day).zfill(2)}")
@@ -233,4 +233,21 @@ def date_bounds_filter(filter_data_object_index, filter_col, *args):
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
-# def date_values_filter():
+def date_values_filter(filter_data_object_index, filter_col, *args):
+  dataset = st.session_state.data_objects[filter_data_object_index]
+  column = dataset.key_owner(filter_col)[filter_col]
+  st.session_state.DateArea = ""
+  date_area, = args
+  date_values = [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]
+  mask = pd.Series(False, index = column.index)
+
+  if st.session_state.FilterInclusionToggle:
+    mask |= ~column.isin(date_values)
+  else:
+    mask |= column.isin(date_values)
+
+  if st.session_state.FilterNoneToggle:
+    mask |= column.isna()
+
+  dataset.filter_owner(filter_col, mask)
+  st.toast(body = f"'{dataset.name}' successfully filtered")
