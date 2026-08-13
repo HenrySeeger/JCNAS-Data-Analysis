@@ -13,16 +13,20 @@ st.header("Cleaning, Filtering, & Merging")
 #* Cleaning Section
 with st.expander(label = "Cleaning"):
   cleaning_data_object_column, cleaning_col_column = st.columns(2)
+
+  #* Data Object Selector
   with cleaning_data_object_column:
     def clean_select_format(num):
       return num if type(num) == str else st.session_state.data_objects[num].name
     cleaning_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), key = "CleaningDataObject", format_func = clean_select_format, label_visibility = "collapsed")
+
+  #* Data Object COlumn Selector
   with cleaning_col_column:
     options = ["Select a Column"] + ([] if cleaning_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[cleaning_data_object_index].applications.keys()) + list(st.session_state.data_objects[cleaning_data_object_index].responses.keys()))))
     cleaning_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "CleaningColumn", disabled = cleaning_data_object_index == "Select a Data Object")
   
   if cleaning_col != "Select a Column":
-    tab_duplicates, tab_replace, tab_remove_col = st.tabs(["Remove Duplicates", "Replace/Remove Applications", "Remove a Column"])
+    tab_duplicates, tab_replace, tab_remove_col = st.tabs(["Remove Duplicates", "Replace/Remove Entries", "Delete a Column"])
 
     #* Remove Duplicates
     with tab_duplicates:
@@ -51,8 +55,68 @@ with st.expander(label = "Cleaning"):
 
     #* Replace Values
     with tab_replace:
-      st.checkbox(label = "Check the box to replace NaN and None values")
-      st.checkbox(label = "Check the box to remove rows with the indicated value instead of replacing them")
+
+      disable_button = True
+
+      #* None Replacement Toggle & Removal Toggle
+      if cleaning_col not in [None, "Select a Column"]:
+        for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
+          with col:
+            if i == 0:
+              st.toggle(label = "label", key = "ReplaceRemoveToggle", value = True, label_visibility = "collapsed")
+            elif i == 1:
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"<span style = 'color: red;'><u>Remove</u></span>/Replace" if not st.session_state.ReplaceRemoveToggle else "Remove/<span style = 'color: red;'><u>Replace</u></span>"}</div>", unsafe_allow_html = True)
+            elif i == 2:
+              st.toggle(label = "label", key = "ReplaceNoneToggle", value = False, label_visibility = "collapsed")
+            else:
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"<span style = 'color: red;'><u>Entries</u></span>/Empty Entries" if not st.session_state.ReplaceNoneToggle else "Entries/<span style = 'color: red;'><u>Empty Entries</u></span>"}</div>", unsafe_allow_html = True)
+      
+      #* Variable Type Selection 
+      match type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col).dtypes[cleaning_col]):
+
+        #* String Variable Type
+        case pd.StringDtype:
+
+          for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
+            with col:
+              if i == 0:
+                string_area_target = st.text_area(label = "List String(s):", placeholder = "Green|Efficient|Energy", value = "", key = "ReplaceStringAreaTarget")
+              elif i == 1:
+                string_area_new = st.text_area(label = "List String(s):", placeholder = "Green|Efficient|Energy", value = "", key = "ReplaceStringAreaNew")
+
+          # disable_button = string_area_target == "" or string_area_new
+          # filter_function = d.string_filter
+          # filter_function_args = ((cleaning_data_object_index, cleaning_col, string_area),
+          #                         ("string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
+          #                         {"string_values" : string_area.split("|")})
+
+        #* Integer Variable Type
+        case np.dtypes.Int64DType:
+          int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
+          try:
+            disable_button = False
+            filter_function = d.int_values_filter
+            filter_function_args = ((cleaning_data_object_index, cleaning_col, int_area),
+                                  ("int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
+                                  {"int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
+          except:
+            if "." in int_area:
+              st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
+            elif int_area not in [None, ""]:
+              st.markdown(":red[Only integers are allowed here.]")
+
+        #* DateTime Variable Type
+        case np.dtypes.DateTime64DType:
+          date_area = st.text_area(label = "List Dates:", placeholder = "YYYY/MM/DD, 2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
+          try:
+            disable_button = False
+            filter_function = d.date_values_filter
+            filter_function_args = ((cleaning_data_object_index, cleaning_col, date_area),
+                                    ("date_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
+                                    {"date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
+          except:
+            st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed here.]")
+
       st.button(label = "Replace Value")
 
     #* Delete a Column
@@ -116,7 +180,7 @@ with st.expander(label = "Filtering"):
             if i == 0:
               st.toggle(label = "Inlcude", key = "FilterExactStringToggle", value = True, label_visibility = "collapsed")
             elif i == 1:
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Is Exact" if st.session_state.FilterExactStringToggle else "Contains"} Word(s)</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Matches Exact" if st.session_state.FilterExactStringToggle else "Contains"} Text</div>", unsafe_allow_html = True)
             elif i == 2:
               st.toggle(label = "Inlcude", key = "FilterCaseSensitivityToggle", value = True, label_visibility = "collapsed")
             else:

@@ -125,7 +125,6 @@ class DataObject:
     return str(self.filter_history)[1:-1]
 
 
-
 def string_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[filter_col]
