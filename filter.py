@@ -26,26 +26,28 @@ with st.expander(label = "Cleaning"):
 
     #* Remove Duplicates
     with tab_duplicates:
+
       def remove_duplicates():
         global cleaning_col
-        match (cleaning_col in st.session_state.data_objects[cleaning_data_object_index].applications.keys(), cleaning_col in st.session_state.data_objects[cleaning_data_object_index].responses.key()):
+        match (cleaning_col in st.session_state.data_objects[cleaning_data_object_index].applications.keys(), cleaning_col in st.session_state.data_objects[cleaning_data_object_index].responses.keys()):
           case (True, False): # column in applications dataset
             initial = len(st.session_state.data_objects[cleaning_data_object_index].applications)
-            st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].applications)} duplicate values")
             st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "applications", cleaning_col, True, True)
           case (False, True): # column in responses dataset
             initial = len(st.session_state.data_objects[cleaning_data_object_index].responses)
-            st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].responses)} duplicate values")
             st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "responses", cleaning_col, True, True)
           case (True, True): # column in both datasets
-            st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col)
-            st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col, inplace = True)
+            st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col, inplace = True)
+            st.toast(body = f"Successfully removed duplicate values")
             st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "both", cleaning_col, True, True)
         cleaning_col = "Select a Column"
 
-      st.button(label = "Remove Duplicates")
+      st.button(label = "Remove Duplicates", on_click = remove_duplicates)
 
     #* Replace Values
     with tab_replace:
@@ -172,7 +174,7 @@ with st.expander(label = "Filtering"):
 
       #* DateTime Variable Type
       case np.dtypes.DateTime64DType:
-        date_tabs = st.segmented_control(label = "date_tabs", options = ["Select Bounds", "Individual Values"], default = "Select Bounds", selection_mode = "single", label_visibility = "collapsed")
+        date_tabs = st.segmented_control(label = "date_tabs", options = ["Select Date Bounds", "Individual Dates"], default = "Select Date Bounds", selection_mode = "single", label_visibility = "collapsed")
         
         #* Earlier and Later Bounds
         if date_tabs == "Select Date Bounds":
@@ -180,11 +182,11 @@ with st.expander(label = "Filtering"):
           with col1:
             st.markdown("<div style='padding-top: 8px;'>Earlier Date</div>", unsafe_allow_html = True)
           with col2:
-            date_earlier_bound = st.number_input(label = "Earlier Date", step = 1, label_visibility = "collapsed", key = "DateEarlierBound", width = 200, value = None)
+            date_earlier_bound = st.date_input(label = "Earlier Date", label_visibility = "collapsed", key = "DateEarlierBound", width = 200, value = None)
           with col3:
             st.markdown("<div style='padding-top: 8px;'>Later Date</div>", unsafe_allow_html = True)
           with col4:
-            date_later_bound = st.number_input(label = "Later Date", step = 1, label_visibility = "collapsed", key = "DateLaterBound", width = 200, value = None)
+            date_later_bound = st.date_input(label = "Later Date", label_visibility = "collapsed", key = "DateLaterBound", width = 200, value = None)
 
           disable_button = date_earlier_bound is None and date_later_bound is None
           if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
@@ -196,8 +198,8 @@ with st.expander(label = "Filtering"):
                                   {"date_earlier_bound" : date_earlier_bound, "date_later_bound" : date_later_bound})
 
       #* List of Dates
-        elif date_tabs == "Individual Values":
-          date_area = st.text_area(label = "List Dates:", placeholder = "2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
+        elif date_tabs == "Individual Dates":
+          date_area = st.text_area(label = "List Dates:", placeholder = "YYYY/MM/DD, 2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
           try:
             disable_button = False
             filter_function = d.date_values_filter

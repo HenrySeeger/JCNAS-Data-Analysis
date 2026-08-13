@@ -212,21 +212,23 @@ def date_bounds_filter(filter_data_object_index, filter_col, *args):
   st.session_state.DateLaterBound = None
   date_earlier_bound, date_later_bound = args
 
-  date_earlier_timestamp = pd.Timestamp(f"{str(date_earlier_bound.year).zfill(4)}-{str(date_earlier_bound.month).zfill(2)}-{str(date_earlier_bound.day).zfill(2)}")
-  date_later_timestamp = pd.Timestamp(f"{str(date_later_bound.year).zfill(4)}-{str(date_later_bound.month).zfill(2)}-{str(date_later_bound.day).zfill(2)}") + pd.Timedelta(days = 1)
+  if date_earlier_bound:
+    date_earlier_timestamp = pd.Timestamp(f"{str(date_earlier_bound.year).zfill(4)}-{str(date_earlier_bound.month).zfill(2)}-{str(date_earlier_bound.day).zfill(2)}")
+  if date_later_bound:
+    date_later_timestamp = pd.Timestamp(f"{str(date_later_bound.year).zfill(4)}-{str(date_later_bound.month).zfill(2)}-{str(date_later_bound.day).zfill(2)}") + pd.Timedelta(days = 1)
 
   if st.session_state.FilterInclusionToggle:
-    mask = pd.Series(False, index = column.index)
-    if date_earlier_bound:
-      mask |= column < date_earlier_timestamp
-    if date_later_bound.value:
-      mask |= column >= date_later_timestamp
-  else:
     mask = pd.Series(True, index = column.index)
     if date_earlier_bound:
       mask &= column >= date_earlier_timestamp
-    if date_later_bound.value:
+    if date_later_bound:
       mask &= column < date_later_timestamp
+  else:
+    mask = pd.Series(False, index = column.index)
+    if date_earlier_bound:
+      mask |= column < date_earlier_timestamp
+    if date_later_bound:
+      mask |= column >= date_later_timestamp
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
 
@@ -242,9 +244,9 @@ def date_values_filter(filter_data_object_index, filter_col, *args):
   mask = pd.Series(False, index = column.index)
 
   if st.session_state.FilterInclusionToggle:
-    mask |= ~column.isin(date_values)
-  else:
     mask |= column.isin(date_values)
+  else:
+    mask |= ~column.isin(date_values)
 
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
