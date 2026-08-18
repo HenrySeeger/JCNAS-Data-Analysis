@@ -38,17 +38,17 @@ with st.expander(label = "Cleaning"):
             initial = len(st.session_state.data_objects[cleaning_data_object_index].applications)
             st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].applications)} duplicate values")
-            st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "applications", cleaning_col, True, True)
+            st.session_state.data_objects[cleaning_data_object_index].add_action_history("duplicates", "applications", cleaning_col)
           case (False, True): # column in responses dataset
             initial = len(st.session_state.data_objects[cleaning_data_object_index].responses)
             st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].responses)} duplicate values")
-            st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "responses", cleaning_col, True, True)
+            st.session_state.data_objects[cleaning_data_object_index].add_action_history("duplicates", "responses", cleaning_col)
           case (True, True): # column in both datasets
             st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col, inplace = True)
             st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed duplicate values")
-            st.session_state.data_objects[cleaning_data_object_index].add_filter_history("duplicates", "both", cleaning_col, True, True)
+            st.session_state.data_objects[cleaning_data_object_index].add_action_history("duplicates", "both", cleaning_col)
         cleaning_col = "Select a Column"
 
       st.button(label = "Remove Duplicates", on_click = remove_duplicates)
@@ -74,7 +74,7 @@ with st.expander(label = "Cleaning"):
               st.markdown(f"<div style='padding-top: 9.5px;'>{"<span style = 'color: red;'><u>Entries</u></span>|Empty Entries" if not st.session_state.ReplaceNoneToggle else "Entries|<span style = 'color: red;'><u>Empty Entries</u></span>"}</div>", unsafe_allow_html = True)
       
       #* Variable Type Selection 
-      match type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col).dtypes[cleaning_col]):
+      match type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]):
 
         #* String Variable Type
         case pd.StringDtype:
@@ -89,28 +89,31 @@ with st.expander(label = "Cleaning"):
           for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
             with col:
               if i == 0:
-                string_area_target = st.text_area(label = "List String(s) to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "Green|Efficient|Energy", value = "", key = "ReplaceStringAreaTarget")
+                string_area_target = st.text_area(label = "List String(s) to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "Old|Text|Example", value = "", key = "ReplaceStringAreaTarget")
               elif i == 1:
-                string_area_new = st.text_area(label = "List New String(s):", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "Green|Efficient|Energy", value = "", key = "ReplaceStringAreaNew")
+                string_area_new = st.text_area(label = "List New String(s):", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "New|Text|Example", value = "", key = "ReplaceStringAreaNew")
 
-          if len(string_area_target.split("|")) != len(string_area_new.split("|")):
+          if st.session_state.ReplaceRemoveToggle and (not st.session_state.ReplaceNoneToggle and len(string_area_target) > 0) and (st.session_state.ReplaceRemoveToggle and len(string_area_new) > 0) and len(string_area_target.split("|")) != len(string_area_new.split("|")):
             st.markdown(f":red[The list of strings that will be replaced must be the same length as the list of strings that they are being replaced with.]")
 
           disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_area_target == "") or (st.session_state.ReplaceRemoveToggle and string_area_new == "") or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(string_area_target.split("|")) != len(string_area_new.split("|")))
           replace_function = d.string_replace
           replace_function_args = ((cleaning_data_object_index, cleaning_col, string_area_target, string_area_new),
-                                   ("replace_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col, st.session_state.ReplaceRemoveToggle, st.session_state.ReplaceNoneToggle),
-                                   {"string_target_values" : string_area_target.split("|"), "string_new_values" : string_area_new.split("|")})
+                                   ("replace_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
+                                   {"replace_remove" : st.session_state.ReplaceRemoveToggle,
+                                    "replace_none" : st.session_state.ReplaceNoneToggle,
+                                    "string_target_values" : string_area_target.split("|"), 
+                                    "string_new_values" : string_area_new.split("|")})
 
         #* Integer Variable Type
         case np.dtypes.Int64DType:
           int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
           try:
-            disable_button = False
-            filter_function = d.int_values_filter
-            filter_function_args = ((cleaning_data_object_index, cleaning_col, int_area),
-                                  ("int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
-                                  {"int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
+            disable_replace_button = False
+            replace_function = d.int_values_replace
+            replace_function_args = ((cleaning_data_object_index, cleaning_col, int_area),
+                                     ("int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
+                                     {"int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
           except:
             if "." in int_area:
               st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
@@ -122,10 +125,10 @@ with st.expander(label = "Cleaning"):
           date_area = st.text_area(label = "List Dates:", placeholder = "YYYY/MM/DD, 2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
           try:
             disable_button = False
-            filter_function = d.date_values_filter
-            filter_function_args = ((cleaning_data_object_index, cleaning_col, date_area),
-                                    ("date_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
-                                    {"date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
+            replace_function = d.date_values_replace
+            replace_function_args = ((cleaning_data_object_index, cleaning_col, date_area),
+                                     ("date_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
+                                     {"date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
           except:
             st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed here.]")
 
@@ -137,9 +140,9 @@ with st.expander(label = "Cleaning"):
             arg1 (tuple): Used for the filtration     | filter_data_object_index, filter_col, any additonal arguments necessray for the filtration
             arg2 (tuple): Used for filtration history | filter_code, dataset, column, include_values, include_none
             arg3  (dict): Used for filtration history | Any keyword arguments specific to the method of filtration
-            """
-        filter_function(*args[0])
-        st.session_state.data_objects[filter_data_object_index].add_filter_history(*args[1], **args[2])
+        """
+        replace_function(*args[0])
+        st.session_state.data_objects[cleaning_data_object_index].add_action_history(*args[1], **args[2])
 
       st.button(label = "Replace Value(s)", disabled = disable_replace_button, on_click = replace_on_click, args = replace_function_args)
 
@@ -154,7 +157,7 @@ with st.expander(label = "Cleaning"):
         if cleaning_col in st.session_state.data_objects[cleaning_data_object_index].responses.keys():
           st.session_state.data_objects[cleaning_data_object_index].responses.drop(columns = cleaning_col, inplace = True)
 
-        st.session_state.data_objects[cleaning_data_object_index].add_filter_history("deletion", "both", cleaning_col, True, True)
+        st.session_state.data_objects[cleaning_data_object_index].add_action_history("deletion", "both", cleaning_col)
         st.toast(body = f"Successfully removed '{"address"}' from '{st.session_state.data_objects[cleaning_data_object_index].name}'")
         cleaning_col = "Select a Column"
 
@@ -195,7 +198,7 @@ with st.expander(label = "Filtering"):
     filter_function_args = None
 
     #* Variable Type Selection 
-    match type(st.session_state.data_objects[filter_data_object_index].key_owner(filter_col).dtypes[filter_col]):
+    match type(st.session_state.data_objects[filter_data_object_index].key_owner(filter_col)[0].dtypes[filter_col]):
 
       #* String Variable Type
       case pd.StringDtype:
@@ -215,8 +218,12 @@ with st.expander(label = "Filtering"):
         disable_button = string_area == ""
         filter_function = d.string_filter
         filter_function_args = ((filter_data_object_index, filter_col, string_area),
-                                ("filter_string", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
-                                {"string_values" : string_area.split("|"), "exact_string" : st.session_state.FilterExactStringToggle, "case_sensitive" : st.session_state.FilterCaseSensitivityToggle})
+                                ("filter_string", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col),
+                                {"include_values" : st.session_state.FilterInclusionToggle,
+                                 "include_none" : st.session_state.FilterNoneToggle,
+                                 "string_values" : string_area.split("|"),
+                                 "exact_string" : st.session_state.FilterExactStringToggle,
+                                 "case_sensitive" : st.session_state.FilterCaseSensitivityToggle})
 
       #* Integer Variable Type
       case np.dtypes.Int64DType:
@@ -234,14 +241,17 @@ with st.expander(label = "Filtering"):
           with col4:
             int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", key = "IntUpperBound", width = 200, value = None)
 
-          disable_button = (int_lower_bound is None and int_upper_bound is None) and int_lower_bound > int_upper_bound
+          disable_button = (int_lower_bound is None and int_upper_bound is None) or (int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound)
           if int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound:
             st.markdown(":red[The lower bound must be less than the upper bound.]")
 
           filter_function = d.int_bounds_filter
           filter_function_args = ((filter_data_object_index, filter_col, int_lower_bound, int_upper_bound),
-                                  ("filter_int_bound", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle), 
-                                  {"int_lower_bound" : int_lower_bound, "int_upper_bound" : int_upper_bound})
+                                  ("filter_int_bound", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col)), 
+                                  {"include_values" : st.session_state.FilterInclusionToggle,
+                                   "include_none" : st.session_state.FilterNoneToggle,
+                                   "int_lower_bound" : int_lower_bound,
+                                   "int_upper_bound" : int_upper_bound})
 
         #* List of Integers
         elif int_tabs == "Individual Values":
@@ -250,8 +260,10 @@ with st.expander(label = "Filtering"):
             disable_button = False
             filter_function = d.int_values_filter
             filter_function_args = ((filter_data_object_index, filter_col, int_area),
-                                    ("filter_int_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
-                                    {"int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
+                                    ("filter_int_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col),
+                                    {"include_values" : st.session_state.FilterInclusionToggle,
+                                     "include_none" : st.session_state.FilterNoneToggle,
+                                     "int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
           except:
             if "." in int_area:
               st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
@@ -282,8 +294,11 @@ with st.expander(label = "Filtering"):
 
           filter_function = d.date_bounds_filter
           filter_function_args = ((filter_data_object_index, filter_col, date_earlier_bound, date_later_bound),
-                                  ("filter_date_bound", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle), 
-                                  {"date_earlier_bound" : date_earlier_bound, "date_later_bound" : date_later_bound})
+                                  ("filter_date_bound", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col), 
+                                  {"include_values" : st.session_state.FilterInclusionToggle,
+                                   "include_none" : st.session_state.FilterNoneToggle,
+                                   "date_earlier_bound" : date_earlier_bound,
+                                   "date_later_bound" : date_later_bound})
 
       #* List of Dates
         elif date_tabs == "Individual Dates":
@@ -292,8 +307,10 @@ with st.expander(label = "Filtering"):
             disable_button = False
             filter_function = d.date_values_filter
             filter_function_args = ((filter_data_object_index, filter_col, date_area),
-                                    ("filter_date_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col, st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle),
-                                    {"date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
+                                    ("filter_date_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col),
+                                    {"include_values" : st.session_state.FilterInclusionToggle,
+                                     "include_none" : st.session_state.FilterNoneToggle,
+                                     "date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
           except:
             st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed here.]")
 
@@ -309,7 +326,7 @@ with st.expander(label = "Filtering"):
           arg3  (dict): Used for filtration history | Any keyword arguments specific to the method of filtration
           """
       filter_function(*args[0])
-      st.session_state.data_objects[filter_data_object_index].add_filter_history(*args[1], **args[2])
+      st.session_state.data_objects[filter_data_object_index].add_action_history(*args[1], **args[2])
 
     st.button(label = "Filter", disabled = disable_button, on_click = filter_on_click, args = filter_function_args)
 

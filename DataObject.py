@@ -46,31 +46,37 @@ class DataObject:
       key (Any): The key to be matched to a dataset
     
     Returns:
-      pandas.DataFrame: The owner dataset
+      list (pandas.DataFrame): The owner(s) dataset, the applicatiosn dataset will be first if both datasets are owners
     """
+    owners = []
     if key in self.applications:
-      return self.applications
-    elif key in self.responses:
-      return self.responses
-    else:
-      raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
+      owners.append(self.applications)
+    if key in self.responses:
+      owners.append(self.responses)
 
-  def key_owner_name(self, key) -> list:
+    if len(owners) == 0:
+      raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
+    return owners
+
+  def key_owner_name(self, key) -> str:
     """
-    Takes a key and produces the owner of the key. Checks the applications dataset first.
+    Takes a key and produces the name of the owner(s) of the key.
 
     Args:
       key (Any): The key to be matched to a dataset
     
     Returns:
-      pandas.DataFrame: The owner dataset
+      str: The name of the owner dataset, produces "Both" if both are the owners
     """
-    if key in self.applications:
-      return "applications"
-    elif key in self.responses:
-      return "responses"
-    else:
-      raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
+    match (key in self.applications, key in self.responses):
+      case (True, True):
+        return "Both"
+      case (True, False):
+        return "applications"
+      case (False, True):
+        return "responses"
+      case _:
+        raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
 
   def filter_owner(self, key, mask):
     if self.key_owner_name(key) == "applications":
@@ -85,7 +91,7 @@ class DataObject:
       self.applications = self.applications[~self.applications["application_id"].isin(removed)]
     # print(self.filter_history)
   
-  def add_filter_history(self, filter_code: str, dataset, column, include_values: bool, include_none: bool, **kwargs) -> None:
+  def add_action_history(self, filter_code: str, dataset, column, **kwargs) -> None:
     """
     Updates the DataObject's filtration history. It also updates the other datasets that weren't directly filtered
 
@@ -94,7 +100,7 @@ class DataObject:
       column (any): The name of the column the filter was applied to. Likely a string.
       **kwargs: Any keyword arguments relevent to the method of filtration. Each method will have its own standard format.
     """
-    self.filter_history.append({"filter_code" : filter_code, "dataset" : dataset, "column" : column, "include_values" : include_values, "include_None" : include_none} | kwargs)
+    self.filter_history.append({"filter_code" : filter_code, "dataset" : dataset, "column" : column} | kwargs)
   
   def undo(self) -> list:
     """
@@ -126,33 +132,40 @@ class DataObject:
 
 
 def string_replace(replace_data_object_index, replace_col, *args):
-  dataset = st.session_state.data_objects[replace_data_object_index]
-  column = dataset.key_owner(replace_col)[replace_col]
+  obj = st.session_state.data_objects[replace_data_object_index]
+  column = obj.key_owner(replace_col)[0][replace_col]
   st.session_state.ReplaceStringAreaTarget = ""
   st.session_state.ReplaceStringAreaNew = ""
   string_area_target, string_area_new = args
   list_strings_target = string_area_target.split("|")
   list_strings_new = string_area_new.split("|")
 
-  if st.session_state.ReplaceNoneToggle:
-    if st.session_state.ReplaceRemoveToggle:
-      dataset = dataset.fillna(value = {column : list_strings_new[0]})
-      st.toast(body = f"Empty entries successfully replaced with '{list_strings_new[0]}' in {dataset.name}'")
+  for dataset in obj.key_owner(replace_col):
+    if st.session_state.ReplaceNoneToggle:
+      if st.session_state.ReplaceRemoveToggle:
+        dataset = dataset.fillna(value = {column : list_strings_new[0]})
+      else:
+        dataset = dataset.dropna(subset = column)
     else:
-      dataset = dataset.dropna(subset = column)
-      st.toast(body = f"Empty entries successfully from {dataset.name}'")
-  else:
-    if st.session_state.ReplaceRemoveToggle:
-      dataset.replace(to_replace = list_strings_target, value = list_strings_new, inplace = True)
-      st.toast(body = f"Successfully replaced the selected values in {replace_col} in {dataset.name}'")
-    else:
-      dataset = dataset[~dataset[column].isin([list_strings_target])]
-      st.toast(body = f"Successfully removed the chosen entries from {dataset.name}'")
+      if st.session_state.ReplaceRemoveToggle:
+        dataset.replace(to_replace = list_strings_target, value = list_strings_new, inplace = True)
+      else:
+        dataset = dataset[~dataset[column].isin([list_strings_target])]
+
+  match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceRemoveToggle):
+    case (True, True):
+      st.toast(body = f"Empty entries successfully replaced with '{list_strings_new[0]}' in {obj.name}'")
+    case (True, False):
+      st.toast(body = f"Empty entries successfully from {obj.name}'")
+    case (False, True):
+      st.toast(body = f"Successfully replaced the selected values in {replace_col} in {obj.name}'")
+    case (False, False):
+      st.toast(body = f"Successfully removed the chosen entries from {obj.name}'")
 
 
 def string_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[filter_col]
+  column = dataset.key_owner(filter_col)[0][filter_col]
   st.session_state.FilterStringArea = ""
   string_area, = args
   list_strings = []
@@ -186,7 +199,7 @@ def string_filter(filter_data_object_index, filter_col, *args):
 
 def int_bounds_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[filter_col]
+  column = dataset.key_owner(filter_col)[0][filter_col]
   st.session_state.IntLowerBound = None
   st.session_state.IntUpperBound = None
   int_lower_bound, int_upper_bound = args
@@ -212,7 +225,7 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
 
 def int_values_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[filter_col]
+  column = dataset.key_owner(filter_col)[0][filter_col]
   st.session_state.IntArea = ""
   int_area, = args
   int_values = [int(num) for num in int_area.replace(" ", "").split(",")]
@@ -231,7 +244,7 @@ def int_values_filter(filter_data_object_index, filter_col, *args):
 
 def date_bounds_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[filter_col]
+  column = dataset.key_owner(filter_col)[0][filter_col]
   st.session_state.DateEarlierBound = None
   st.session_state.DateLaterBound = None
   date_earlier_bound, date_later_bound = args
@@ -261,7 +274,7 @@ def date_bounds_filter(filter_data_object_index, filter_col, *args):
 
 def date_values_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[filter_col]
+  column = dataset.key_owner(filter_col)[0][filter_col]
   st.session_state.DateArea = ""
   date_area, = args
   date_values = [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]
