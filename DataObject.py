@@ -125,6 +125,31 @@ class DataObject:
     return str(self.filter_history)[1:-1]
 
 
+def string_replace(replace_data_object_index, replace_col, *args):
+  dataset = st.session_state.data_objects[replace_data_object_index]
+  column = dataset.key_owner(replace_col)[replace_col]
+  st.session_state.ReplaceStringAreaTarget = ""
+  st.session_state.ReplaceStringAreaNew = ""
+  string_area_target, string_area_new = args
+  list_strings_target = string_area_target.split("|")
+  list_strings_new = string_area_new.split("|")
+
+  if st.session_state.ReplaceNoneToggle:
+    if st.session_state.ReplaceRemoveToggle:
+      dataset = dataset.fillna(value = {column : list_strings_new[0]})
+      st.toast(body = f"Empty entries successfully replaced with '{list_strings_new[0]}' in {dataset.name}'")
+    else:
+      dataset = dataset.dropna(subset = column)
+      st.toast(body = f"Empty entries successfully from {dataset.name}'")
+  else:
+    if st.session_state.ReplaceRemoveToggle:
+      dataset.replace(to_replace = list_strings_target, value = list_strings_new, inplace = True)
+      st.toast(body = f"Successfully replaced the selected values in {replace_col} in {dataset.name}'")
+    else:
+      dataset = dataset[~dataset[column].isin([list_strings_target])]
+      st.toast(body = f"Successfully removed the chosen entries from {dataset.name}'")
+
+
 def string_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[filter_col]
@@ -136,9 +161,9 @@ def string_filter(filter_data_object_index, filter_col, *args):
   for string in string_area.split("|"):
     list_strings.append(string.strip())
 
-  if st.session_state.FilterInclusionToggle: # A 'True' value indicates inclusivity
-    if st.session_state.FilterExactStringToggle: # 'True' indicates filtering for the exact string(s), false allows for strings containing a target string
-      if st.session_state.FilterCaseSensitivityToggle: # 'True' indicates case-sensitivity, 'False' insensitivity
+  if st.session_state.FilterInclusionToggle: # A True value indicates inclusivity
+    if st.session_state.FilterExactStringToggle: # True indicates filtering for the exact string(s), false allows for strings containing a target string
+      if st.session_state.FilterCaseSensitivityToggle: # True indicates case-sensitivity, False insensitivity
         mask |= column.isin(list_strings)
       else:
         mask |= column.str.lower().isin([string.lower() for string in list_strings])
