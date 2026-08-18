@@ -20,7 +20,7 @@ with st.expander(label = "Cleaning"):
       return num if type(num) == str else st.session_state.data_objects[num].name
     cleaning_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), key = "CleaningDataObject", format_func = clean_select_format, label_visibility = "collapsed")
 
-  #* Data Object COlumn Selector
+  #* Data Object Column Selector
   with cleaning_col_column:
     options = ["Select a Column"] + ([] if cleaning_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[cleaning_data_object_index].applications.keys()) + list(st.session_state.data_objects[cleaning_data_object_index].responses.keys()))))
     cleaning_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "CleaningColumn", disabled = cleaning_data_object_index == "Select a Data Object")
@@ -144,7 +144,7 @@ with st.expander(label = "Cleaning"):
         replace_function(*args[0])
         st.session_state.data_objects[cleaning_data_object_index].add_action_history(*args[1], **args[2])
 
-      st.button(label = "Replace Value(s)", disabled = disable_replace_button, on_click = replace_on_click, args = replace_function_args)
+      st.button(label = f"{"Replace" if st.session_state.ReplaceRemoveToggle else "Remove"} Value(s)", disabled = disable_replace_button, on_click = replace_on_click, args = replace_function_args)
 
     #* Delete a Column
     with tab_remove_col:

@@ -78,7 +78,7 @@ class DataObject:
       case _:
         raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
 
-  def filter_owner(self, key, mask):
+  def filter_owner(self, key, mask): #! There may be an issue regarding the changes to key_owner_name(), specifically with the addition of "Both"
     if self.key_owner_name(key) == "applications":
       pre_filter_applications = self.applications
       self.applications = self.applications[mask]
@@ -90,6 +90,12 @@ class DataObject:
       removed = set(pre_filter_responses["application_id"]) - set(self.responses["application_id"])
       self.applications = self.applications[~self.applications["application_id"].isin(removed)]
     # print(self.filter_history)
+  
+  def remove_from_owner(self, key, list_strings_target):
+    if key in self.applications:
+      self.applications = self.applications[~self.applications[key].isin(list_strings_target)]
+    if key in self.responses:
+      self.responses = self.responses[~self.responses[key].isin(list_strings_target)]
   
   def add_action_history(self, filter_code: str, dataset, column, **kwargs) -> None:
     """
@@ -133,7 +139,6 @@ class DataObject:
 
 def string_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
-  column = obj.key_owner(replace_col)[0][replace_col]
   st.session_state.ReplaceStringAreaTarget = ""
   st.session_state.ReplaceStringAreaNew = ""
   string_area_target, string_area_new = args
@@ -141,6 +146,7 @@ def string_replace(replace_data_object_index, replace_col, *args):
   list_strings_new = string_area_new.split("|")
 
   for dataset in obj.key_owner(replace_col):
+    column = obj.key_owner(replace_col)[0][replace_col]
     if st.session_state.ReplaceNoneToggle:
       if st.session_state.ReplaceRemoveToggle:
         dataset = dataset.fillna(value = {column : list_strings_new[0]})
@@ -150,7 +156,9 @@ def string_replace(replace_data_object_index, replace_col, *args):
       if st.session_state.ReplaceRemoveToggle:
         dataset.replace(to_replace = list_strings_target, value = list_strings_new, inplace = True)
       else:
-        dataset = dataset[~dataset[column].isin([list_strings_target])]
+        # dataset = dataset[~dataset[replace_col].isin([list_strings_target])]
+        # dataset = dataset[dataset[replace_col] != list_strings_target[0]]
+        obj.remove_from_owner(replace_col, list_strings_target)
 
   match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceRemoveToggle):
     case (True, True):
