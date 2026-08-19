@@ -32,7 +32,7 @@ class DataObject:
     self.name = name
     self.applications = datesToDatetime(applications)
     self.responses = datesToDatetime(responses)
-    self.filter_history = [] # Each element in the list is {"filter_code" : filter_code, "dataset" : dataset, "column" : column, "include_values" : include_values, "include_None" : include_none} + additional kwargs
+    self.action_history = [] # Each element in the list is {"filter_code" : filter_code, "dataset" : dataset, "column" : column, "include_values" : include_values, "include_None" : include_none} + additional kwargs
   
   @classmethod
   def from_dataobject(self, name: str, dataobject):
@@ -89,7 +89,7 @@ class DataObject:
       self.responses = self.responses[mask]
       removed = set(pre_filter_responses["application_id"]) - set(self.responses["application_id"])
       self.applications = self.applications[~self.applications["application_id"].isin(removed)]
-    # print(self.filter_history)
+    # print(self.action_history)
   
   def remove_from_owner(self, key, list_strings_target):
     if key in self.applications:
@@ -106,7 +106,7 @@ class DataObject:
       column (any): The name of the column the filter was applied to. Likely a string.
       **kwargs: Any keyword arguments relevent to the method of filtration. Each method will have its own standard format.
     """
-    self.filter_history.append({"filter_code" : filter_code, "dataset" : dataset, "column" : column} | kwargs)
+    self.action_history.append({"filter_code" : filter_code, "dataset" : dataset, "column" : column} | kwargs)
   
   def undo(self) -> list:
     """
@@ -119,8 +119,8 @@ class DataObject:
       list:
         [filter_type (str), [arg1, arg2, etc]]
     """
-    filter_removed = self.filter_history[-1]
-    self.filter_history.pop()
+    filter_removed = self.action_history[-1]
+    self.action_history.pop()
     return filter_removed
   
   def filtration_actions_string(self) -> str:
@@ -134,41 +134,73 @@ class DataObject:
       str:
         String representation of the filtration actions recorded in the list
     """
-    return str(self.filter_history)[1:-1]
+    return str(self.action_history)[1:-1]
 
 
-def string_replace(replace_data_object_index, replace_col, *args):
+def values_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
   st.session_state.ReplaceStringAreaTarget = ""
   st.session_state.ReplaceStringAreaNew = ""
   string_area_target, string_area_new = args
-  list_strings_target = string_area_target.split("|")
-  list_strings_new = string_area_new.split("|")
+  list_target = string_area_target.split("|")
+  list_new = string_area_new.split("|")
 
   for dataset in obj.key_owner(replace_col):
     column = obj.key_owner(replace_col)[0][replace_col]
     if st.session_state.ReplaceNoneToggle:
       if st.session_state.ReplaceRemoveToggle:
-        dataset = dataset.fillna(value = {column : list_strings_new[0]})
+        dataset = dataset.fillna(value = {column : list_new[0]})
       else:
         dataset = dataset.dropna(subset = column)
     else:
       if st.session_state.ReplaceRemoveToggle:
-        dataset.replace(to_replace = list_strings_target, value = list_strings_new, inplace = True)
+        dataset.replace(to_replace = list_target, value = list_new, inplace = True)
       else:
-        # dataset = dataset[~dataset[replace_col].isin([list_strings_target])]
-        # dataset = dataset[dataset[replace_col] != list_strings_target[0]]
-        obj.remove_from_owner(replace_col, list_strings_target)
+        obj.remove_from_owner(replace_col, list_target)
+        break
 
   match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceRemoveToggle):
     case (True, True):
-      st.toast(body = f"Empty entries successfully replaced with '{list_strings_new[0]}' in {obj.name}'")
+      st.toast(body = f"Empty entries successfully replaced with '{list_new[0]}' in {obj.name}'")
     case (True, False):
       st.toast(body = f"Empty entries successfully from {obj.name}'")
     case (False, True):
       st.toast(body = f"Successfully replaced the selected values in {replace_col} in {obj.name}'")
     case (False, False):
       st.toast(body = f"Successfully removed the chosen entries from {obj.name}'")
+
+def int_bounds_replace(replace_data_object_index, replace_col, *args): #! This and the date variant need to actually remove/replace
+  obj = st.session_state.data_objects[replace_data_object_index]
+  st.session_state.ReplaceIntLowerBound = None
+  st.session_state.ReplaceIntUpperBound = None
+  int_lower_bound, int_upper_bound = args
+
+  for dataset in obj.key_owner(replace_col):
+    if st.session_state.ReplaceIntInclusionToggle:
+      dataset = dataset[(True if int_lower_bound is None else int_lower_bound >= dataset[replace_col]) & 
+                        (True if int_upper_bound is None else dataset[replace_col] <= int_upper_bound)]
+    else:
+      dataset = dataset[(True if int_lower_bound is None else dataset[replace_col] < int_lower_bound) | 
+                        (True if int_upper_bound is None else int_upper_bound < dataset[replace_col])]
+
+def date_bounds_replace(replace_data_object_index, replace_col, *args):
+  obj = st.session_state.data_objects[replace_data_object_index]
+  st.session_state.ReplaceDateEarlierBound = None
+  st.session_state.ReplaceDateLaterBound = None
+  date_earlier_bound, date_later_bound = args
+
+  if date_earlier_bound:
+    date_earlier_timestamp = pd.Timestamp(date_earlier_bound)
+  if date_later_bound:
+    date_later_timestamp = pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)
+
+  for dataset in obj.key_owner(replace_col):
+    if st.session_state.ReplaceDateInclusionToggle:
+      dataset = dataset[(True if date_earlier_timestamp is None else date_earlier_timestamp >= dataset[replace_col]) & 
+                        (True if date_later_timestamp is None else dataset[replace_col] <= date_later_timestamp)]
+    else:
+      dataset = dataset[(True if date_earlier_timestamp is None else dataset[replace_col] < date_earlier_timestamp) | 
+                        (True if date_later_timestamp is None else date_later_timestamp < dataset[replace_col])]
 
 
 def string_filter(filter_data_object_index, filter_col, *args):
@@ -208,8 +240,8 @@ def string_filter(filter_data_object_index, filter_col, *args):
 def int_bounds_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.IntLowerBound = None
-  st.session_state.IntUpperBound = None
+  st.session_state.FilterIntLowerBound = None
+  st.session_state.FilterIntUpperBound = None
   int_lower_bound, int_upper_bound = args
 
   if st.session_state.FilterInclusionToggle:
@@ -234,7 +266,7 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
 def int_values_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.IntArea = ""
+  st.session_state.FilterIntArea = ""
   int_area, = args
   int_values = [int(num) for num in int_area.replace(" ", "").split(",")]
   mask = pd.Series(False, index = column.index)
@@ -253,14 +285,14 @@ def int_values_filter(filter_data_object_index, filter_col, *args):
 def date_bounds_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.DateEarlierBound = None
-  st.session_state.DateLaterBound = None
+  st.session_state.FilterDateEarlierBound = None
+  st.session_state.FilterDateLaterBound = None
   date_earlier_bound, date_later_bound = args
 
   if date_earlier_bound:
-    date_earlier_timestamp = pd.Timestamp(f"{str(date_earlier_bound.year).zfill(4)}-{str(date_earlier_bound.month).zfill(2)}-{str(date_earlier_bound.day).zfill(2)}")
+    date_earlier_timestamp = pd.Timestamp(date_earlier_bound)
   if date_later_bound:
-    date_later_timestamp = pd.Timestamp(f"{str(date_later_bound.year).zfill(4)}-{str(date_later_bound.month).zfill(2)}-{str(date_later_bound.day).zfill(2)}") + pd.Timedelta(days = 1)
+    date_later_timestamp = pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)
 
   if st.session_state.FilterInclusionToggle:
     mask = pd.Series(True, index = column.index)
@@ -283,7 +315,7 @@ def date_bounds_filter(filter_data_object_index, filter_col, *args):
 def date_values_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.DateArea = ""
+  st.session_state.FilterDateArea = ""
   date_area, = args
   date_values = [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]
   mask = pd.Series(False, index = column.index)

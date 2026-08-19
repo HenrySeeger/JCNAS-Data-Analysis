@@ -89,15 +89,16 @@ with st.expander(label = "Cleaning"):
           for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
             with col:
               if i == 0:
-                string_area_target = st.text_area(label = "List String(s) to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "Old|Text|Example", value = "", key = "ReplaceStringAreaTarget")
+                string_area_target = st.text_area(label = "List Text to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "Old|Text|Example", value = "", key = "ReplaceStringAreaTarget")
               elif i == 1:
-                string_area_new = st.text_area(label = "List New String(s):", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "New|Text|Example", value = "", key = "ReplaceStringAreaNew")
+                string_area_new = st.text_area(label = "List New Text:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "New|Text|Example", value = "", key = "ReplaceStringAreaNew")
 
           if st.session_state.ReplaceRemoveToggle and (not st.session_state.ReplaceNoneToggle and len(string_area_target) > 0) and (st.session_state.ReplaceRemoveToggle and len(string_area_new) > 0) and len(string_area_target.split("|")) != len(string_area_new.split("|")):
             st.markdown(f":red[The list of strings that will be replaced must be the same length as the list of strings that they are being replaced with.]")
 
+          #! Need to update this to include that, when replacing None values, the length of the new strings must be 1
           disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_area_target == "") or (st.session_state.ReplaceRemoveToggle and string_area_new == "") or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(string_area_target.split("|")) != len(string_area_new.split("|")))
-          replace_function = d.string_replace
+          replace_function = d.values_replace
           replace_function_args = ((cleaning_data_object_index, cleaning_col, string_area_target, string_area_new),
                                    ("replace_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
                                    {"replace_remove" : st.session_state.ReplaceRemoveToggle,
@@ -107,39 +108,139 @@ with st.expander(label = "Cleaning"):
 
         #* Integer Variable Type
         case np.dtypes.Int64DType:
-          int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
-          try:
-            disable_replace_button = False
-            replace_function = d.int_values_replace
-            replace_function_args = ((cleaning_data_object_index, cleaning_col, int_area),
-                                     ("int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
-                                     {"int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
-          except:
-            if "." in int_area:
-              st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
-            elif int_area not in [None, ""]:
-              st.markdown(":red[Only integers are allowed here.]")
+          replace_int_tabs = st.segmented_control(label = "replace_int_tabs", options = ["Select Bounds", "Individual Values"], default = "Select Bounds", selection_mode = "single", label_visibility = "collapsed")
+
+          #* Lower and Upper Bounds
+          if replace_int_tabs == "Select Bounds":
+            for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
+              with col:
+                if i == 0:
+                  st.toggle(label = "Inlcude", key = "ReplaceIntInclusionToggle", value = True, label_visibility = "collapsed")
+                elif i == 1:
+                  st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.ReplaceIntInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+        
+            col1, col2, col3 = st.columns([1, 2.5, 3.5], gap = None)
+            with col1:
+              st.markdown("<div style='padding-top: 37px;'>Lower Bound</div>", unsafe_allow_html = True)
+              st.markdown("<div style='padding-top: 31px;'>Upper Bound</div>", unsafe_allow_html = True)
+            with col2:
+              st.markdown("<div style='height: 29px'></div>", unsafe_allow_html=True)
+              int_lower_bound = st.number_input(label = "Lower Bound", step = 1, disabled = st.session_state.ReplaceNoneToggle, label_visibility = "collapsed", key = "ReplaceIntLowerBound", width = 200, value = None)
+              int_upper_bound = st.number_input(label = "Upper Bound", step = 1, disabled = st.session_state.ReplaceNoneToggle, label_visibility = "collapsed", key = "ReplaceIntUpperBound", width = 200, value = None)
+            with col3:
+              int_area_new = st.text_area(label = "List New Integers:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "4|5|6", value = "", key = "ReplaceIntAreaNew")
+
+            if int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound:
+              st.markdown(":red[The lower bound must be less than the upper bound.]")
+
+            disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_lower_bound == None and int_upper_bound == None) or (st.session_state.ReplaceRemoveToggle and int_area_new == "")
+            replace_function = d.int_bounds_replace
+            replace_function_args = ((cleaning_data_object_index, cleaning_col, int_lower_bound, int_upper_bound, int_area_new),
+                                    ("replace_int_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
+                                    {"replace_remove" : st.session_state.ReplaceRemoveToggle,
+                                     "replace_none" : st.session_state.ReplaceNoneToggle,
+                                     "include_values" : st.session_state.ReplaceIntInclusionToggle,
+                                     "int_lower_bound" : int_lower_bound,
+                                     "int_upper_bound" : int_upper_bound,
+                                     "int_new_values" : [] if len(int_area_new) == 0 else [int(num) for num in int_area_new.replace(" ", "").replace("\n", "").split("|")]})
+
+          #* List of Integers
+          elif replace_int_tabs == "Individual Values":
+            for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
+              with col:
+                if i == 0:
+                  int_area_target = st.text_area(label = "List Integers to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "1|2|3", value = "", key = "ReplaceIntAreaTarget")
+                elif i == 1:
+                  int_area_new = st.text_area(label = "List New Integers:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "4|5|6", value = "", key = "ReplaceIntAreaNew")
+
+            try:
+              disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_area_target == "") or (st.session_state.ReplaceRemoveToggle and int_area_new == "") or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(int_area_target.split("|")) != len(int_area_new.split("|")))
+              replace_function = d.values_replace
+              replace_function_args = ((cleaning_data_object_index, cleaning_col, int_area_target, int_area_new),
+                                      ("replace_int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
+                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
+                                       "replace_none" : st.session_state.ReplaceNoneToggle,
+                                       "int_target_values" : [] if len(int_area_target) == 0 else [int(num) for num in int_area_target.replace(" ", "").replace("\n", "").split("|")],
+                                       "int_new_values" : [] if len(int_area_new) == 0 else [int(num) for num in int_area_new.replace(" ", "").replace("\n", "").split("|")]})
+            except:
+              if "." in int_area_target or "." in int_area_new:
+                st.markdown(":red[Decimals should not be used, only integers are allowed.]")
+              elif int_area_target not in [None, ""] or int_area_new not in [None, ""]:
+                st.markdown(":red[Only integers are allowed.]")
+              disable_replace_button = True
 
         #* DateTime Variable Type
         case np.dtypes.DateTime64DType:
-          date_area = st.text_area(label = "List Dates:", placeholder = "YYYY/MM/DD, 2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
-          try:
-            disable_button = False
-            replace_function = d.date_values_replace
-            replace_function_args = ((cleaning_data_object_index, cleaning_col, date_area),
-                                     ("date_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
-                                     {"date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
-          except:
-            st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed here.]")
+          date_tabs = st.segmented_control(label = "date_tabs", options = ["Select Date Bounds", "Individual Dates"], default = "Select Date Bounds", selection_mode = "single", label_visibility = "collapsed")    
+          
+          #* Earlier and Later Bounds
+          for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
+            with col:
+              if i == 0:
+                st.toggle(label = "Inlcude", key = "ReplaceDateInclusionToggle", value = True, label_visibility = "collapsed")
+              elif i == 1:
+                st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.ReplaceDateInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+
+          if date_tabs == "Select Date Bounds":
+            col1, col2, col3 = st.columns([1, 2.5, 3.5], gap = None)
+            with col1:
+              st.markdown("<div style='padding-top: 34px;'>Earlier Date</div>", unsafe_allow_html = True)
+              st.markdown("<div style='padding-top: 28px;'>Later Date</div>", unsafe_allow_html = True)
+            with col2:
+              st.markdown("<div style='padding-top: 28px;'></div>", unsafe_allow_html = True)
+              date_earlier_bound = st.date_input(label = "Earlier Date", label_visibility = "collapsed", key = "ReplaceDateEarlierBound", width = 200, value = None)
+              date_later_bound = st.date_input(label = "Later Date", label_visibility = "collapsed", key = "ReplaceDateLaterBound", width = 200, value = None)
+            with col3:
+              date_area_new = st.text_area(label = "List New Dates:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "YYYY-MM-DD|2026-08-19|2025-03-12", value = "", key = "ReplaceDateAreaNew")
+
+            if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
+              st.markdown(":red[The lower bound must be less than the upper bound.]")
+
+            try:
+              disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_earlier_bound == None and date_later_bound == None) or (st.session_state.ReplaceRemoveToggle and date_area_new == "")
+              replace_function = d.date_bounds_replace
+              replace_function_args = ((cleaning_data_object_index, cleaning_col, date_earlier_bound, date_later_bound),
+                                      ("replace_date_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
+                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
+                                      "replace_none" : st.session_state.ReplaceNoneToggle,
+                                      "include_values" : st.session_state.ReplaceDateInclusionToggle,
+                                      "date_earlier_bound" : date_earlier_bound,
+                                      "date_later_bound" : date_later_bound,
+                                      "date_new_values" : [] if len(date_area_new) == 0 else [pd.Timestamp(date) for date in date_area_new.replace(" ", "").replace("\n", "").split("|")]})
+            except:
+              st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed.]")
+              disable_replace_button = True
+
+        #* List of Dates
+          elif date_tabs == "Individual Dates":
+            for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
+              with col:
+                if i == 0:
+                  date_area_target = st.text_area(label = "List Dates to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "YYYY-MM-DD|2026-08-10|2025-03-12", value = "", key = "ReplaceDateAreaTarget")
+                elif i == 1:
+                  date_area_new = st.text_area(label = "List New Dates:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "YYYY-MM-DD|2026-08-19|2025-03-12", value = "", key = "ReplaceDateAreaNew")
+
+            try:
+              disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_area_target == "") or (st.session_state.ReplaceRemoveToggle and date_area_new == "") or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(date_area_target.split("|")) != len(date_area_new.split("|")))
+              replace_function = d.values_replace
+              replace_function_args = ((cleaning_data_object_index, cleaning_col, date_area_target, date_area_new),
+                                      ("replace_int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
+                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
+                                       "replace_none" : st.session_state.ReplaceNoneToggle,
+                                       "int_target_values" : [pd.Timestamp(date) for date in date_area_target.replace(" ", "").replace("\n", "").split("|")],
+                                       "int_new_values" : [pd.Timestamp(date) for date in date_area_new.replace(" ", "").replace("\n", "").split("|")]})
+            except:
+              st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed.]")
+              disable_replace_button = True
 
       def replace_on_click(*args):
         """
-          Updates the DataObject's filtration history (which includes cleaning).
+          Updates the DataObject's action history (which includes cleaning).
         
-          Args: #! Need to update this
-            arg1 (tuple): Used for the filtration     | filter_data_object_index, filter_col, any additonal arguments necessray for the filtration
-            arg2 (tuple): Used for filtration history | filter_code, dataset, column, include_values, include_none
-            arg3  (dict): Used for filtration history | Any keyword arguments specific to the method of filtration
+          Args:
+            arg1 (tuple): Used for the action     | cleaning_data_object_index, cleaning_col, any additonal arguments necessray for the action
+            arg2 (tuple): Used for action history | action_code, dataset, column, include_values, include_none
+            arg3  (dict): Used for action history | Any keyword arguments specific to the method of filtration
         """
         replace_function(*args[0])
         st.session_state.data_objects[cleaning_data_object_index].add_action_history(*args[1], **args[2])
@@ -235,15 +336,15 @@ with st.expander(label = "Filtering"):
           with col1:
             st.markdown("<div style='padding-top: 8px;'>Lower Bound</div>", unsafe_allow_html = True)
           with col2:
-            int_lower_bound = st.number_input(label = "Lower Bound", step = 1, label_visibility = "collapsed", key = "IntLowerBound", width = 200, value = None)
+            int_lower_bound = st.number_input(label = "Lower Bound", step = 1, label_visibility = "collapsed", key = "FilterIntLowerBound", width = 200, value = None)
           with col3:
             st.markdown("<div style='padding-top: 8px;'>Upper Bound</div>", unsafe_allow_html = True)
           with col4:
-            int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", key = "IntUpperBound", width = 200, value = None)
+            int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", key = "FilterIntUpperBound", width = 200, value = None)
 
           disable_button = (int_lower_bound is None and int_upper_bound is None) or (int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound)
           if int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound:
-            st.markdown(":red[The lower bound must be less than the upper bound.]")
+            st.markdown(":red[The lower bound must not be greater than the upper bound.]")
 
           filter_function = d.int_bounds_filter
           filter_function_args = ((filter_data_object_index, filter_col, int_lower_bound, int_upper_bound),
@@ -255,7 +356,7 @@ with st.expander(label = "Filtering"):
 
         #* List of Integers
         elif int_tabs == "Individual Values":
-          int_area = st.text_area(label = "List Integers:", placeholder = "1, 2, 3, . . .", value = "", key = "IntArea")
+          int_area = st.text_area(label = "List Integers:", placeholder = "1|2|3", value = "", key = "FilterIntArea")
           try:
             disable_button = False
             filter_function = d.int_values_filter
@@ -263,12 +364,12 @@ with st.expander(label = "Filtering"):
                                     ("filter_int_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col),
                                     {"include_values" : st.session_state.FilterInclusionToggle,
                                      "include_none" : st.session_state.FilterNoneToggle,
-                                     "int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split(",")]})
+                                     "int_values" : [int(num) for num in int_area.replace(" ", "").replace("\n", "").split("|")]})
           except:
             if "." in int_area:
-              st.markdown(":red[Decimals should not be used here, only integers are allowed.]")
+              st.markdown(":red[Decimals should not be used, only integers are allowed.]")
             elif int_area not in [None, ""]:
-              st.markdown(":red[Only integers are allowed here.]")
+              st.markdown(":red[Only integers are allowed.]")
 
             disable_button = True
 
@@ -282,15 +383,15 @@ with st.expander(label = "Filtering"):
           with col1:
             st.markdown("<div style='padding-top: 8px;'>Earlier Date</div>", unsafe_allow_html = True)
           with col2:
-            date_earlier_bound = st.date_input(label = "Earlier Date", label_visibility = "collapsed", key = "DateEarlierBound", width = 200, value = None)
+            date_earlier_bound = st.date_input(label = "Earlier Date", label_visibility = "collapsed", key = "FilterDateEarlierBound", width = 200, value = None)
           with col3:
             st.markdown("<div style='padding-top: 8px;'>Later Date</div>", unsafe_allow_html = True)
           with col4:
-            date_later_bound = st.date_input(label = "Later Date", label_visibility = "collapsed", key = "DateLaterBound", width = 200, value = None)
+            date_later_bound = st.date_input(label = "Later Date", label_visibility = "collapsed", key = "FilterDateLaterBound", width = 200, value = None)
 
-          disable_button = date_earlier_bound is None and date_later_bound is None
+          disable_button = (date_earlier_bound is None and date_later_bound is None) or (date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound > date_later_bound)
           if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
-            st.markdown(":red[The lower bound must be less than the upper bound.]")
+            st.markdown(":red[The lower bound must not be greater than the upper bound.]")
 
           filter_function = d.date_bounds_filter
           filter_function_args = ((filter_data_object_index, filter_col, date_earlier_bound, date_later_bound),
@@ -302,7 +403,7 @@ with st.expander(label = "Filtering"):
 
       #* List of Dates
         elif date_tabs == "Individual Dates":
-          date_area = st.text_area(label = "List Dates:", placeholder = "YYYY/MM/DD, 2026/08/10, 2025/03/12, . . .", value = "", key = "DateArea")
+          date_area = st.text_area(label = "List Dates:", placeholder = "YYYY-MM-DD|2026-08-10|2025-03-12", value = "", key = "FilterDateArea")
           try:
             disable_button = False
             filter_function = d.date_values_filter
@@ -310,20 +411,19 @@ with st.expander(label = "Filtering"):
                                     ("filter_date_values", st.session_state.data_objects[filter_data_object_index].key_owner_name(filter_col), filter_col),
                                     {"include_values" : st.session_state.FilterInclusionToggle,
                                      "include_none" : st.session_state.FilterNoneToggle,
-                                     "date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]})
+                                     "date_values" : [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split("|")]})
           except:
-            st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed here.]")
-
+            st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed.]")
             disable_button = True
 
     def filter_on_click(*args):
       """
-        Updates the DataObject's filtration history. It also updates the other datasets that weren't directly filtered
+        Updates the DataObject's action history. It also updates the other datasets that weren't directly filtered
       
         Args:
-          arg1 (tuple): Used for the filtration     | filter_data_object_index, filter_col, any additonal arguments necessray for the filtration
-          arg2 (tuple): Used for filtration history | filter_code, dataset, column, include_values, include_none
-          arg3  (dict): Used for filtration history | Any keyword arguments specific to the method of filtration
+          arg1 (tuple): Used for the action     | filter_data_object_index, filter_col, any additonal arguments necessray for the action
+          arg2 (tuple): Used for action history | filter_code, dataset, column
+          arg3  (dict): Used for action history | Any keyword arguments specific to the method of action
           """
       filter_function(*args[0])
       st.session_state.data_objects[filter_data_object_index].add_action_history(*args[1], **args[2])
