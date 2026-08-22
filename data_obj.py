@@ -112,7 +112,7 @@ with st.expander(label = "Create a Data Object"):
     else:
       st.toast(body = f"'{creation_name_input}' could not be created because it is the name of an existing DataObject")
 
-  obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None, on_click = creation_button_on_click)
+  obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or creation_name_input == "", on_click = creation_button_on_click)
 
 with st.expander(label = "Manage Data Objects"):
   def data_manager_formatting(data):

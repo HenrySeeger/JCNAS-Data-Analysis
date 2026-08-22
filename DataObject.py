@@ -66,11 +66,11 @@ class DataObject:
       key (Any): The key to be matched to a dataset
     
     Returns:
-      str: The name of the owner dataset, produces "Both" if both are the owners
+      str: The name of the owner dataset, produces "both" if both are the owners
     """
     match (key in self.applications, key in self.responses):
       case (True, True):
-        return "Both"
+        return "both"
       case (True, False):
         return "applications"
       case (False, True):
@@ -78,8 +78,8 @@ class DataObject:
       case _:
         raise KeyError(f"'{key}' is not a key in either the applications or responses dataset")
 
-  def filter_owner(self, key, mask): #! There may be an issue regarding the changes to key_owner_name(), specifically with the addition of "Both"
-    if self.key_owner_name(key) == "applications":
+  def filter_owner(self, key, mask):
+    if self.key_owner_name(key) in ["applications", "both"]:
       pre_filter_applications = self.applications
       self.applications = self.applications[mask]
       removed = set(pre_filter_applications["application_id"]) - set(self.applications["application_id"])
@@ -89,7 +89,6 @@ class DataObject:
       self.responses = self.responses[mask]
       removed = set(pre_filter_responses["application_id"]) - set(self.responses["application_id"])
       self.applications = self.applications[~self.applications["application_id"].isin(removed)]
-    # print(self.action_history)
   
   def remove_from_owner(self, key, list_strings_target):
     if key in self.applications:
@@ -139,11 +138,9 @@ class DataObject:
 
 def values_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
-  st.session_state.ReplaceStringAreaTarget = ""
-  st.session_state.ReplaceStringAreaNew = ""
-  string_area_target, string_area_new = args
-  list_target = string_area_target.split("|")
-  list_new = string_area_new.split("|")
+  st.session_state.ReplaceStringSelectionsTarget = ""
+  st.session_state.ReplaceStringSelectionsNew = ""
+  list_target, list_new = args
 
   for dataset in obj.key_owner(replace_col):
     column = obj.key_owner(replace_col)[0][replace_col]
@@ -206,13 +203,9 @@ def date_bounds_replace(replace_data_object_index, replace_col, *args):
 def string_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterStringArea = ""
-  string_area, = args
-  list_strings = []
+  st.session_state.FilterStringSelections = []
+  list_strings, = args
   mask = pd.Series(False, index = column.index)
-
-  for string in string_area.split("|"):
-    list_strings.append(string.strip())
 
   if st.session_state.FilterInclusionToggle: # A True value indicates inclusivity
     if st.session_state.FilterExactStringToggle: # True indicates filtering for the exact string(s), false allows for strings containing a target string
@@ -266,15 +259,15 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
 def int_values_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterIntArea = ""
-  int_area, = args
-  int_values = [int(num) for num in int_area.replace(" ", "").split(",")]
+  st.session_state.FilterIntSelections = []
+  int_selections, = args
+  int_selections = [int(num) for num in int_selections]
   mask = pd.Series(False, index = column.index)
 
   if st.session_state.FilterInclusionToggle:
-    mask |= column.isin(int_values)
+    mask |= column.isin(int_selections)
   else:
-    mask |= ~column.isin(int_values)
+    mask |= ~column.isin(int_selections)
 
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
@@ -315,15 +308,15 @@ def date_bounds_filter(filter_data_object_index, filter_col, *args):
 def date_values_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
   column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterDateArea = ""
+  st.session_state.FilterDateSelections = []
   date_area, = args
-  date_values = [pd.Timestamp(date) for date in date_area.replace(" ", "").replace("\n", "").split(",")]
+  date_area = [pd.Timestamp(date) for date in date_area]
   mask = pd.Series(False, index = column.index)
 
   if st.session_state.FilterInclusionToggle:
-    mask |= column.isin(date_values)
+    mask |= column.isin(date_area)
   else:
-    mask |= ~column.isin(date_values)
+    mask |= ~column.isin(date_area)
 
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
