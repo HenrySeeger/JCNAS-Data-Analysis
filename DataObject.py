@@ -138,67 +138,86 @@ class DataObject:
 
 def values_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
-  st.session_state.ReplaceStringSelectionsTarget = ""
-  st.session_state.ReplaceStringSelectionsNew = ""
+  st.session_state.ReplaceStringSelectionsTarget = []
+  st.session_state.ReplaceStringSelectionsNew = []
+  st.session_state.ReplaceIntSelectionsTarget = []
+  st.session_state.ReplaceIntSelectionsNew = []
+  st.session_state.ReplaceDateSelectionsTarget = []
+  st.session_state.ReplaceDateSelectionsNew = []
   list_target, list_new = args
 
   for dataset in obj.key_owner(replace_col):
-    column = obj.key_owner(replace_col)[0][replace_col]
-    if st.session_state.ReplaceNoneToggle:
-      if st.session_state.ReplaceRemoveToggle:
-        dataset = dataset.fillna(value = {column : list_new[0]})
-      else:
-        dataset = dataset.dropna(subset = column)
-    else:
-      if st.session_state.ReplaceRemoveToggle:
+    match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
+      case (True, True):
+        dataset.fillna(value = {replace_col : list_new[0]}, inplace = True)
+      case (True, False):
+        dataset.loc[dataset[dataset[replace_col] is not None]] = list_new[0]
+      case (False, True):
         dataset.replace(to_replace = list_target, value = list_new, inplace = True)
-      else:
-        obj.remove_from_owner(replace_col, list_target)
-        break
+      case (False, False):
+        dataset.loc[dataset[~dataset[replace_col].isin(list_target)]] = list_new[0] #! If this option is selected the selections len() should be bounded to 1
 
-  match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceRemoveToggle):
+  match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
     case (True, True):
-      st.toast(body = f"Empty entries successfully replaced with '{list_new[0]}' in {obj.name}'")
+      st.toast(body = f"Empty entries successfully replaced with '{list_new[0]}' in '{replace_col}' in {obj.name}'")
     case (True, False):
-      st.toast(body = f"Empty entries successfully from {obj.name}'")
+      st.toast(body = f"Non-empty entries successfully replaced with '{list_new[0]}' in '{replace_col}' in {obj.name}'")
     case (False, True):
-      st.toast(body = f"Successfully replaced the selected values in {replace_col} in {obj.name}'")
+      st.toast(body = f"Successfully replaced the specified values in {replace_col} in {obj.name}'")
     case (False, False):
-      st.toast(body = f"Successfully removed the chosen entries from {obj.name}'")
+      st.toast(body = f"Successfully replaced all non-specified values in {replace_col} in {obj.name}'")
 
-def int_bounds_replace(replace_data_object_index, replace_col, *args): #! This and the date variant need to actually remove/replace
+def bounds_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
   st.session_state.ReplaceIntLowerBound = None
   st.session_state.ReplaceIntUpperBound = None
-  int_lower_bound, int_upper_bound = args
-
-  for dataset in obj.key_owner(replace_col):
-    if st.session_state.ReplaceIntInclusionToggle:
-      dataset = dataset[(True if int_lower_bound is None else int_lower_bound >= dataset[replace_col]) & 
-                        (True if int_upper_bound is None else dataset[replace_col] <= int_upper_bound)]
-    else:
-      dataset = dataset[(True if int_lower_bound is None else dataset[replace_col] < int_lower_bound) | 
-                        (True if int_upper_bound is None else int_upper_bound < dataset[replace_col])]
-
-def date_bounds_replace(replace_data_object_index, replace_col, *args):
-  obj = st.session_state.data_objects[replace_data_object_index]
+  st.session_state.ReplaceIntNewBound = None
   st.session_state.ReplaceDateEarlierBound = None
   st.session_state.ReplaceDateLaterBound = None
-  date_earlier_bound, date_later_bound = args
-
-  if date_earlier_bound:
-    date_earlier_timestamp = pd.Timestamp(date_earlier_bound)
-  if date_later_bound:
-    date_later_timestamp = pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)
+  st.session_state.ReplaceDateNewBound = None
+  lower_bound, upper_bound, replace_bound = args
 
   for dataset in obj.key_owner(replace_col):
-    if st.session_state.ReplaceDateInclusionToggle:
-      dataset = dataset[(True if date_earlier_timestamp is None else date_earlier_timestamp >= dataset[replace_col]) & 
-                        (True if date_later_timestamp is None else dataset[replace_col] <= date_later_timestamp)]
-    else:
-      dataset = dataset[(True if date_earlier_timestamp is None else dataset[replace_col] < date_earlier_timestamp) | 
-                        (True if date_later_timestamp is None else date_later_timestamp < dataset[replace_col])]
+    match(st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
+      case (True, True): # Replace empty entries
+        dataset.fillna(value = {replace_col : replace_bound})
+      case (True, False): # Replace non-empty entries
+        dataset.loc[dataset[dataset[replace_col] != None]] = replace_bound
+      case (False, True): # Replace bounded entries
+        dataset.loc[dataset[(True if lower_bound is None else lower_bound <= dataset[replace_col]) & 
+                            (True if upper_bound is None else upper_bound >= dataset[replace_col])], replace_col] = replace_bound
+      case (False, False): # Replace entries outside the bounds
+        dataset.loc[dataset[(True if lower_bound is None else lower_bound > dataset[replace_col]) | 
+                            (True if upper_bound is None else upper_bound < dataset[replace_col])], replace_col] = replace_bound
 
+  match(st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
+    case (True, True): # Replace empty entries
+      st.toast(body = f"Successfully replaced empty entries with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
+    case (True, False): # Replace non-empty entries
+      st.toast(body = f"Successfully replaced non-empty entries with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
+    case (False, True): # Replace bounded entries #! Update this and the following toast later to account for all bound-usage possibilities
+      st.toast(body = f"Successfully replaced entries within the bound(s) with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
+    case (False, False): # Replace entries outside the bounds
+      st.toast(body = f"Successfully replaced entries outside the bound(s) with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
+
+# def date_bounds_replace(replace_data_object_index, replace_col, *args):
+#   obj = st.session_state.data_objects[replace_data_object_index]
+#   st.session_state.ReplaceDateEarlierBound = None
+#   st.session_state.ReplaceDateLaterBound = None
+#   date_earlier_bound, date_later_bound, date_new_bound = args
+
+#   if date_earlier_bound:
+#     date_earlier_timestamp = pd.Timestamp(date_earlier_bound)
+#   if date_later_bound:
+#     date_later_timestamp = pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)
+
+#   for dataset in obj.key_owner(replace_col):
+#     if st.session_state.ReplaceDateInclusionToggle:
+#       dataset.loc[dataset[(True if date_earlier_timestamp is None else date_earlier_timestamp >= dataset[replace_col]) & 
+#                           (True if date_later_timestamp is None else dataset[replace_col] <= date_later_timestamp)]] = date_new_bound
+#     else:
+#       dataset.loc[dataset[(True if date_earlier_timestamp is None else dataset[replace_col] < date_earlier_timestamp) | 
+#                           (True if date_later_timestamp is None else date_later_timestamp < dataset[replace_col])]] = date_new_bound
 
 def string_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
@@ -250,7 +269,7 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
     if int_lower_bound:
       mask |= column < int_lower_bound
 
-  if st.session_state.FilterNoneToggle:
+  if st.session_state.FilterNoneToggle: #! .dropna(subset = replace_col, inplace = True) (?)
     mask |= column.isna()
 
   dataset.filter_owner(filter_col, mask)

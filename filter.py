@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("filter_state", None)
+st.session_state.setdefault("ReplaceNoneToggle", False)
 
 st.header("Cleaning, Filtering, & Merging")
 
@@ -26,7 +27,7 @@ with st.expander(label = "Cleaning"):
     cleaning_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "CleaningColumn", disabled = cleaning_data_object_index == "Select a Data Object")
   
   if cleaning_col != "Select a Column":
-    tab_duplicates, tab_replace, tab_remove_col = st.tabs(["Remove Duplicates", "Replace/Remove Entries", "Delete a Column"])
+    tab_duplicates, tab_replace, tab_remove_col = st.tabs(["Remove Duplicates", "Replace Entries", "Delete a Column"])
 
     #* Remove Duplicates
     with tab_duplicates:
@@ -62,16 +63,16 @@ with st.expander(label = "Cleaning"):
 
       #* None Replacement Toggle & Removal Toggle
       if cleaning_col not in [None, "Select a Column"]:
-        for i, col in enumerate(st.columns([1, 2, 1, 14], gap = "xxsmall", border = False)):
+        for i, col in enumerate(st.columns([1, 3.76 if st.session_state.ReplaceNoneToggle else 2.5, 1, 12.24 if st.session_state.ReplaceNoneToggle else 13.5], gap = "xxsmall", border = False)):
           with col:
             if i == 0:
-              st.toggle(label = "label", key = "ReplaceRemoveToggle", value = True, label_visibility = "collapsed")
-            elif i == 1:
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Remove" if not st.session_state.ReplaceRemoveToggle else "Replace"}</div>", unsafe_allow_html = True)
-            elif i == 2:
               st.toggle(label = "label", key = "ReplaceNoneToggle", value = False, label_visibility = "collapsed")
-            else:
+            elif i == 1:
               st.markdown(f"<div style='padding-top: 9.5px;'>{"Entries" if not st.session_state.ReplaceNoneToggle else "Empty Entries"}</div>", unsafe_allow_html = True)
+            elif i == 2:
+              st.toggle(label = "Inlcude", key = "ReplaceInclusionToggle", value = True, label_visibility = "collapsed")
+            else:
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.ReplaceInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
       
       #* Variable Type Selection 
       match type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]):
@@ -89,20 +90,16 @@ with st.expander(label = "Cleaning"):
           for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
             with col:
               if i == 0:
-                string_selections_target = st.multiselect(label = f"List Text to be {"Replaced" if st.session_state.ReplaceRemoveToggle else "Removed"}:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, key = "ReplaceStringSelectionsTarget")
+                string_selections_target = st.multiselect(label = f"List Text to be Replaced:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, key = "ReplaceStringSelectionsTarget")
               elif i == 1:
-                string_selections_new = st.multiselect(label = "List New Text:", disabled = not st.session_state.ReplaceRemoveToggle, options = None, accept_new_options = True, key = "ReplaceStringSelectionsNew")
+                string_selections_new = st.multiselect(label = "List New Text:", options = None, accept_new_options = True, key = "ReplaceStringSelectionsNew")
 
-          if st.session_state.ReplaceRemoveToggle and (not st.session_state.ReplaceNoneToggle and len(string_selections_target) > 0) and (st.session_state.ReplaceRemoveToggle and len(string_selections_new) > 0) and len(string_selections_target) != len(string_selections_new):
-            st.markdown(f":red[The list of strings that will be replaced must be the same length as the list of strings that they are being replaced with.]")
-
-          #! Need to update this to include that, when replacing None values, the length of the new strings must be 1
-          disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_selections_target == []) or (st.session_state.ReplaceRemoveToggle and string_selections_new == []) or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(string_selections_target) != len(string_selections_new))
+#                                        trying to replace entries without target selections             trying to replace without new selections                 trying to replace entries without an equal number of target and new selections                 trying to replace empty entries without exactly 1 target selection
+          disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_selections_target == []) or (string_selections_new == []) or (not st.session_state.ReplaceNoneToggle and len(string_selections_target) != len(string_selections_new)) or (st.session_state.ReplaceNoneToggle and len(string_selections_new) != 1)
           replace_function = d.values_replace
           replace_function_args = ((cleaning_data_object_index, cleaning_col, string_selections_target, string_selections_new),
                                    ("replace_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
-                                   {"replace_remove" : st.session_state.ReplaceRemoveToggle,
-                                    "replace_none" : st.session_state.ReplaceNoneToggle,
+                                   {"replace_none" : st.session_state.ReplaceNoneToggle,
                                     "string_target_values" : string_selections_target, 
                                     "string_new_values" : string_selections_new})
 
@@ -112,64 +109,48 @@ with st.expander(label = "Cleaning"):
 
           #* Lower and Upper Bounds
           if replace_int_tabs == "Select Bounds":
-            for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
-              with col:
-                if i == 0:
-                  st.toggle(label = "Inlcude", key = "ReplaceIntInclusionToggle", value = True, label_visibility = "collapsed")
-                elif i == 1:
-                  st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.ReplaceIntInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
-        
-            col1, col2, col3 = st.columns([1, 2.5, 3.5], gap = None)
+            col1, col2, col3, col4 = st.columns([1, 2.5, 1, 2.5], gap = None)
             with col1:
-              st.markdown(f"<div style='padding-top: 37px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Lower Bound</div>", unsafe_allow_html = True) #Remove|<span style = 'color: red;'><u>Replace</u></span>
-              st.markdown(f"<div style='padding-top: 31px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Upper Bound</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Lower Bound</div>", unsafe_allow_html = True) #Remove|<span style = 'color: red;'><u>Replace</u></span>
+              st.markdown(f"<div style='padding-top: 30px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Upper Bound</div>", unsafe_allow_html = True)
             with col2:
-              st.markdown("<div style='height: 29px'></div>", unsafe_allow_html=True)
               int_lower_bound = st.number_input(label = "Lower Bound", step = 1, disabled = st.session_state.ReplaceNoneToggle, label_visibility = "collapsed", key = "ReplaceIntLowerBound", width = 200, value = None)
               int_upper_bound = st.number_input(label = "Upper Bound", step = 1, disabled = st.session_state.ReplaceNoneToggle, label_visibility = "collapsed", key = "ReplaceIntUpperBound", width = 200, value = None)
             with col3:
-              # int_area_new = st.text_area(label = "List New Integers:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "4|5|6", value = "", key = "ReplaceIntAreaNew")
-              int_selections_new = st.multiselect(label = "List New Integers:", disabled = not st.session_state.ReplaceRemoveToggle, options = None, accept_new_options = True, key = "ReplaceIntSelectionsNew")
+              st.markdown(f"<div style='padding-top: 9.5px;'>New Integer</div>", unsafe_allow_html = True)
+            with col4:
+              int_new_bound = st.number_input(label = "New Integer:", step = 1, label_visibility = "collapsed", key = "ReplaceIntBoundNew", width = 200, value = None)
 
             if int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound:
               st.markdown(":red[The lower bound must be less than the upper bound.]")
 
-            try:
-              disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_lower_bound == None and int_upper_bound == None) or (st.session_state.ReplaceRemoveToggle and int_selections_new == [])
-              replace_function = d.int_bounds_replace
-              replace_function_args = ((cleaning_data_object_index, cleaning_col, int_lower_bound, int_upper_bound, int_selections_new),
-                                      ("replace_int_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
-                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
-                                      "replace_none" : st.session_state.ReplaceNoneToggle,
-                                      "include_values" : st.session_state.ReplaceIntInclusionToggle,
-                                      "int_lower_bound" : int_lower_bound,
-                                      "int_upper_bound" : int_upper_bound,
-                                      "int_new_values" : [int(num) for num in int_selections_new]})
-            except:
-              if len([i for i in int_selections_new if "." in i]) > 0:
-                st.markdown(":red[Decimals should not be used, only integers are allowed.]")
-              elif int_selections_new not in [None, []]:
-                st.markdown(":red[Only integers are allowed.]")
-              disable_replace_button = True
+#                                                      trying to replace entries without either bound entered                       trying to replace entries without a new value
+            disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_lower_bound == None and int_upper_bound == None) or (int_new_bound is None)
+            replace_function = d.bounds_replace
+            replace_function_args = ((cleaning_data_object_index, cleaning_col, int_lower_bound, int_upper_bound, int_new_bound),
+                                    ("replace_int_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
+                                    {"replace_none" : st.session_state.ReplaceNoneToggle,
+                                    "include_values" : st.session_state.ReplaceInclusionToggle,
+                                    "int_lower_bound" : int_lower_bound,
+                                    "int_upper_bound" : int_upper_bound,
+                                    "int_new_values" : int_new_bound})
 
           #* List of Integers
           elif replace_int_tabs == "Individual Values":
             for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
               with col:
                 if i == 0:
-                  # int_area_target = st.text_area(label = "List Integers to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "1|2|3", value = "", key = "ReplaceIntAreaTarget")
-                  int_selections_target = st.multiselect(label = f"List Integers to be {"Replaced" if st.session_state.ReplaceRemoveToggle else "Removed"}:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, key = "ReplaceIntSelectionsTarget")
+                  int_selections_target = st.multiselect(label = f"List Integers to be Replaced:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, key = "ReplaceIntSelectionsTarget")
                 elif i == 1:
-                  # int_area_new = st.text_area(label = "List New Integers:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "4|5|6", value = "", key = "ReplaceIntAreaNew")
-                  int_selections_new = st.multiselect(label = "List New Integers:", disabled = not st.session_state.ReplaceRemoveToggle, options = None, accept_new_options = True, key = "ReplaceIntSelectionsNew")
+                  int_selections_new = st.multiselect(label = "List New Integers:", options = None, accept_new_options = True, key = "ReplaceIntSelectionsNew")
 
             try:
-              disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_selections_target == []) or (st.session_state.ReplaceRemoveToggle and int_selections_new == []) or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(int_selections_target) != len(int_selections_new))
+#                                                 trying to replace entries without target integers       trying to replace entries without new values              trying to replace entries without an equal number of target and new selections
+              disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_selections_target == []) or (int_selections_new == []) or (not st.session_state.ReplaceNoneToggle and len(int_selections_target) != len(int_selections_new))
               replace_function = d.values_replace
               replace_function_args = ((cleaning_data_object_index, cleaning_col, int_selections_target, int_selections_new),
                                       ("replace_int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
-                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
-                                       "replace_none" : st.session_state.ReplaceNoneToggle,
+                                      {"replace_none" : st.session_state.ReplaceNoneToggle,
                                        "int_target_values" : [int(num) for num in int_selections_target],
                                        "int_new_values" : [int(num) for num in int_selections_new]})
             except:
@@ -184,66 +165,54 @@ with st.expander(label = "Cleaning"):
           date_tabs = st.segmented_control(label = "date_tabs", options = ["Select Date Bounds", "Individual Dates"], default = "Select Date Bounds", selection_mode = "single", label_visibility = "collapsed")    
           
           #* Earlier and Later Bounds
-          for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
-            with col:
-              if i == 0:
-                st.toggle(label = "Inlcude", key = "ReplaceDateInclusionToggle", value = True, label_visibility = "collapsed")
-              elif i == 1:
-                st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.ReplaceDateInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
-
           if date_tabs == "Select Date Bounds":
-            col1, col2, col3 = st.columns([1, 2.5, 3.5], gap = None)
+            col1, col2, col3, col4 = st.columns([1, 2.5, 1, 2.5], gap = None)
             with col1:
-              st.markdown(f"<div style='padding-top: 34px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Earlier Date</div>", unsafe_allow_html = True)
-              st.markdown(f"<div style='padding-top: 28px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Later Date</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Earlier Date</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 30px; color: rgb({"100, 100, 100" if st.session_state.ReplaceNoneToggle else "255, 255, 255"});'>Later Date</div>", unsafe_allow_html = True)
             with col2:
-              st.markdown("<div style='padding-top: 28px;'></div>", unsafe_allow_html = True)
               date_earlier_bound = st.date_input(label = "Earlier Date", label_visibility = "collapsed", disabled = st.session_state.ReplaceNoneToggle, key = "ReplaceDateEarlierBound", width = 200, value = None)
               date_later_bound = st.date_input(label = "Later Date", label_visibility = "collapsed", disabled = st.session_state.ReplaceNoneToggle, key = "ReplaceDateLaterBound", width = 200, value = None)
             with col3:
-              # date_area_new = st.text_area(label = "List New Dates:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "YYYY-MM-DD|2026-08-19|2025-03-12", value = "", key = "ReplaceDateAreaNew")
-              date_selections_new = st.multiselect(label = "List New Dates:", disabled = not st.session_state.ReplaceRemoveToggle, options = None, accept_new_options = True, placeholder = "YYYY-MM-DD", key = "ReplaceDateSelectionsNew")
+              st.markdown(f"<div style='padding-top: 9.5px;'>New Date</div>", unsafe_allow_html = True)
+            with col4:
+              date_new_bound = st.date_input(label = "List a New Date", label_visibility = "collapsed", key = "ReplaceDateBoundNew", width = 200, value = None)
 
             if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
               st.markdown(":red[The lower bound must be less than the upper bound.]")
 
-            try: #! Currently no detections for YYYY-MM-DD, should be fine for monthly/daily selections (?)
-              disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_earlier_bound == None and date_later_bound == None) or (st.session_state.ReplaceRemoveToggle and date_selections_new == [])
-              replace_function = d.date_bounds_replace
-              replace_function_args = ((cleaning_data_object_index, cleaning_col, date_earlier_bound, date_later_bound),
-                                      ("replace_date_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
-                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
-                                       "replace_none" : st.session_state.ReplaceNoneToggle,
-                                       "include_values" : st.session_state.ReplaceDateInclusionToggle,
-                                       "date_earlier_bound" : date_earlier_bound,
-                                       "date_later_bound" : date_later_bound,
-                                       "date_new_values" : [pd.Timestamp(date) for date in date_selections_new]})
-            except:
-              st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed.]")
-              disable_replace_button = True
+            #! Currently no detections for YYYY-MM-DD, should be fine for monthly/daily selections (?)
+#                                                       trying to replace entries without either bound entered                             trying to replace entries without a new value
+            disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_earlier_bound == None and date_later_bound == None) or (date_new_bound is None)
+            replace_function = d.bounds_replace
+            replace_function_args = ((cleaning_data_object_index, cleaning_col, pd.Timestamp(date_earlier_bound), pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)),
+                                    ("replace_date_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
+                                    {"replace_none" : st.session_state.ReplaceNoneToggle,
+                                     "include_values" : st.session_state.ReplaceInclusionToggle,
+                                     "date_earlier_bound" : date_earlier_bound,
+                                     "date_later_bound" : date_later_bound,
+                                     "date_new_values" : date_new_bound})
 
         #* List of Dates
           elif date_tabs == "Individual Dates":
             for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
               with col:
                 if i == 0:
-                  # date_area_target = st.text_area(label = "List Dates to be Replaced or Removed:", disabled = st.session_state.ReplaceNoneToggle, placeholder = "YYYY-MM-DD|2026-08-10|2025-03-12", value = "", key = "ReplaceDateAreaTarget")
-                  date_selections_target = st.multiselect(label = f"List Integers to be {"Replaced" if st.session_state.ReplaceRemoveToggle else "Removed"}:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, placeholder = "YYYY-MM-DD", key = "ReplaceDateAreaTarget")
+                  date_selections_target = st.multiselect(label = f"List Dates to be Replaced:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "ReplaceDateAreaTarget")
                 elif i == 1:
-                  # date_area_new = st.text_area(label = "List New Dates:", disabled = not st.session_state.ReplaceRemoveToggle, placeholder = "YYYY-MM-DD|2026-08-19|2025-03-12", value = "", key = "ReplaceDateAreaNew")
-                  date_selections_new = st.multiselect(label = "List New Dates:", disabled = not st.session_state.ReplaceRemoveToggle, options = None, accept_new_options = True, placeholder = "YYYY-MM-DD", key = "ReplaceDateAreaNew")
+                  date_selections_new = st.multiselect(label = "List New Dates:", options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "ReplaceDateAreaNew")
 
             try:
-              disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (st.session_state.ReplaceRemoveToggle and date_selections_new == []) or (not st.session_state.ReplaceNoneToggle and st.session_state.ReplaceRemoveToggle and len(date_selections_target) != len(date_selections_new))
+#                                                 trying to replace entries without target dates          trying to replace entries without new values              trying to replace entries without an equal number of target and new selections              
+              disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (date_selections_new == []) or (not st.session_state.ReplaceNoneToggle and len(date_selections_target) != len(date_selections_new))
               replace_function = d.values_replace
               replace_function_args = ((cleaning_data_object_index, cleaning_col, date_selections_target, date_selections_new),
                                       ("replace_int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
-                                      {"replace_remove" : st.session_state.ReplaceRemoveToggle,
-                                       "replace_none" : st.session_state.ReplaceNoneToggle,
+                                      {"replace_none" : st.session_state.ReplaceNoneToggle,
                                        "int_target_values" : [pd.Timestamp(date) for date in date_selections_target],
                                        "int_new_values" : [pd.Timestamp(date) for date in date_selections_new]})
             except:
-              st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed.]")
+              st.markdown(":red[Only dates ('YYYY/MM/DD') are allowed.]")
               disable_replace_button = True
 
       def replace_on_click(*args):
@@ -258,7 +227,7 @@ with st.expander(label = "Cleaning"):
         replace_function(*args[0])
         st.session_state.data_objects[cleaning_data_object_index].add_action_history(*args[1], **args[2])
 
-      st.button(label = f"{"Replace" if st.session_state.ReplaceRemoveToggle else "Remove"} Value(s)", disabled = disable_replace_button, on_click = replace_on_click, args = replace_function_args)
+      st.button(label = f"Replace Value(s)", disabled = disable_replace_button, on_click = replace_on_click, args = replace_function_args)
 
     #* Delete a Column
     with tab_remove_col:
@@ -301,7 +270,7 @@ with st.expander(label = "Filtering"):
           st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = True, label_visibility = "collapsed")
         elif i == 1:
           st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
-        elif i == 2:
+        elif i == 2: #! Disable somethings based on this toggle, make removing None entries an option (like what replace/remove used to have)
           st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = True, label_visibility = "collapsed")
         else:
           st.markdown(f"<div style='padding-top: 9.5px;'>{"Keep" if st.session_state.FilterNoneToggle else "Remove"} Empty Values</div>", unsafe_allow_html = True)
@@ -418,7 +387,7 @@ with st.expander(label = "Filtering"):
 
       #* List of Dates
         elif date_tabs == "Individual Dates":
-          date_selections = st.multiselect(label = "List Dates:", options = None, accept_new_options = True, key = "FilterDateSelections")
+          date_selections = st.multiselect(label = "List Dates:", options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "FilterDateSelections")
 
           try:
             disable_button = False
