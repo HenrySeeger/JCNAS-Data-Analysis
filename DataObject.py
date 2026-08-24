@@ -136,7 +136,7 @@ class DataObject:
     return str(self.action_history)[1:-1]
 
 
-def values_replace(replace_data_object_index, replace_col, *args):
+def values_replace(replace_data_object_index, replace_col, *args): #! May need a separate function for str for case sensitivity
   obj = st.session_state.data_objects[replace_data_object_index]
   st.session_state.ReplaceStringSelectionsTarget = []
   st.session_state.ReplaceStringSelectionsNew = []
