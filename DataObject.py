@@ -136,10 +136,32 @@ class DataObject:
     return str(self.action_history)[1:-1]
 
 
-def values_replace(replace_data_object_index, replace_col, *args): #! May need a separate function for str for case sensitivity
+def string_values_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
   st.session_state.ReplaceStringSelectionsTarget = []
   st.session_state.ReplaceStringSelectionsNew = []
+  list_target, list_new = args
+
+  for dataset in obj.key_owner(replace_col):
+    match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceInclusionToggle, st.session_state.ReplaceCaseSensitiveToggle):
+      case (True, True, True) | (True, True, False):
+        dataset.fillna(value = {replace_col : list_new[0]}, inplace = True)
+      case (True, False, True) | (True, False, False):
+        dataset.loc[dataset[replace_col] is not None, replace_col] = list_new[0]
+      case (False, True, True):
+        dataset.replace(to_replace = {replace_col : {target : new for target, new in zip(list_target, list_new)}}, inplace = True)
+      case (False, True, False):
+        for target, new in zip(list_target, list_new):
+          dataset[replace_col] = dataset[replace_col].str.replace(target, new, case = False)
+      case (False, False, True):
+        dataset.loc[~dataset[replace_col].isin(list_target), replace_col] = list_new[0]
+      case (False, False, False):
+        dataset.loc[~dataset[replace_col].str.lower().isin(list_target), replace_col] = list_new[0]
+
+  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
+
+def values_replace(replace_data_object_index, replace_col, *args): #* Int and Date
+  obj = st.session_state.data_objects[replace_data_object_index]
   st.session_state.ReplaceIntSelectionsTarget = []
   st.session_state.ReplaceIntSelectionsNew = []
   st.session_state.ReplaceDateSelectionsTarget = []
@@ -147,25 +169,17 @@ def values_replace(replace_data_object_index, replace_col, *args): #! May need a
   list_target, list_new = args
 
   for dataset in obj.key_owner(replace_col):
-    match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
+    match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceInclusionToggle):
       case (True, True):
         dataset.fillna(value = {replace_col : list_new[0]}, inplace = True)
       case (True, False):
-        dataset.loc[dataset[dataset[replace_col] is not None]] = list_new[0]
+        dataset.loc[dataset[replace_col] is not None, replace_col] = list_new[0]
       case (False, True):
-        dataset.replace(to_replace = list_target, value = list_new, inplace = True)
+        dataset.replace(to_replace = {replace_col : {target : new for target, new in zip(list_target, list_new)}}, inplace = True)
       case (False, False):
-        dataset.loc[dataset[~dataset[replace_col].isin(list_target)]] = list_new[0] #! If this option is selected the selections len() should be bounded to 1
+        dataset.loc[~dataset[replace_col].isin(list_target), replace_col] = list_new[0]
 
-  match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
-    case (True, True):
-      st.toast(body = f"Empty entries successfully replaced with '{list_new[0]}' in '{replace_col}' in {obj.name}'")
-    case (True, False):
-      st.toast(body = f"Non-empty entries successfully replaced with '{list_new[0]}' in '{replace_col}' in {obj.name}'")
-    case (False, True):
-      st.toast(body = f"Successfully replaced the specified values in {replace_col} in {obj.name}'")
-    case (False, False):
-      st.toast(body = f"Successfully replaced all non-specified values in {replace_col} in {obj.name}'")
+  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
 
 def bounds_replace(replace_data_object_index, replace_col, *args):
   obj = st.session_state.data_objects[replace_data_object_index]
@@ -178,46 +192,20 @@ def bounds_replace(replace_data_object_index, replace_col, *args):
   lower_bound, upper_bound, replace_bound = args
 
   for dataset in obj.key_owner(replace_col):
-    match(st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
+    match(st.session_state.ReplaceNoneToggle, st.session_state.ReplaceInclusionToggle):
       case (True, True): # Replace empty entries
         dataset.fillna(value = {replace_col : replace_bound})
       case (True, False): # Replace non-empty entries
-        dataset.loc[dataset[dataset[replace_col] != None]] = replace_bound
+        dataset.loc[dataset[replace_col] != None] = replace_bound
       case (False, True): # Replace bounded entries
-        dataset.loc[dataset[(True if lower_bound is None else lower_bound <= dataset[replace_col]) & 
-                            (True if upper_bound is None else upper_bound >= dataset[replace_col])], replace_col] = replace_bound
+        dataset.loc[(True if lower_bound is None else lower_bound <= dataset[replace_col]) & 
+                    (True if upper_bound is None else upper_bound >= dataset[replace_col]), replace_col] = replace_bound
       case (False, False): # Replace entries outside the bounds
-        dataset.loc[dataset[(True if lower_bound is None else lower_bound > dataset[replace_col]) | 
-                            (True if upper_bound is None else upper_bound < dataset[replace_col])], replace_col] = replace_bound
+        dataset.loc[(True if lower_bound is None else lower_bound > dataset[replace_col]) |
+                    (True if upper_bound is None else upper_bound < dataset[replace_col]), replace_col] = replace_bound
 
-  match(st.session_state.ReplaceNoneToggle, st.session_state.ReplaceIncludeToggle):
-    case (True, True): # Replace empty entries
-      st.toast(body = f"Successfully replaced empty entries with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
-    case (True, False): # Replace non-empty entries
-      st.toast(body = f"Successfully replaced non-empty entries with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
-    case (False, True): # Replace bounded entries #! Update this and the following toast later to account for all bound-usage possibilities
-      st.toast(body = f"Successfully replaced entries within the bound(s) with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
-    case (False, False): # Replace entries outside the bounds
-      st.toast(body = f"Successfully replaced entries outside the bound(s) with '{replace_bound}' in '{replace_col}' in '{obj.name}'")
+  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
 
-# def date_bounds_replace(replace_data_object_index, replace_col, *args):
-#   obj = st.session_state.data_objects[replace_data_object_index]
-#   st.session_state.ReplaceDateEarlierBound = None
-#   st.session_state.ReplaceDateLaterBound = None
-#   date_earlier_bound, date_later_bound, date_new_bound = args
-
-#   if date_earlier_bound:
-#     date_earlier_timestamp = pd.Timestamp(date_earlier_bound)
-#   if date_later_bound:
-#     date_later_timestamp = pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)
-
-#   for dataset in obj.key_owner(replace_col):
-#     if st.session_state.ReplaceDateInclusionToggle:
-#       dataset.loc[dataset[(True if date_earlier_timestamp is None else date_earlier_timestamp >= dataset[replace_col]) & 
-#                           (True if date_later_timestamp is None else dataset[replace_col] <= date_later_timestamp)]] = date_new_bound
-#     else:
-#       dataset.loc[dataset[(True if date_earlier_timestamp is None else dataset[replace_col] < date_earlier_timestamp) | 
-#                           (True if date_later_timestamp is None else date_later_timestamp < dataset[replace_col])]] = date_new_bound
 
 def string_filter(filter_data_object_index, filter_col, *args):
   dataset = st.session_state.data_objects[filter_data_object_index]
@@ -226,24 +214,38 @@ def string_filter(filter_data_object_index, filter_col, *args):
   list_strings, = args
   mask = pd.Series(False, index = column.index)
 
-  if st.session_state.FilterInclusionToggle: # A True value indicates inclusivity
-    if st.session_state.FilterExactStringToggle: # True indicates filtering for the exact string(s), false allows for strings containing a target string
-      if st.session_state.FilterCaseSensitivityToggle: # True indicates case-sensitivity, False insensitivity
-        mask |= column.isin(list_strings)
-      else:
-        mask |= column.str.lower().isin([string.lower() for string in list_strings])
-    else:
-      mask |= column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
-  else:
-    if st.session_state.FilterExactStringToggle:
-      if st.session_state.FilterCaseSensitivityToggle:
-        mask |= ~column.isin(list_strings)
-      else:
-        mask |= ~column.str.lower().isin([string.lower() for string in list_strings])
-    else:
-      mask |= ~column.str.contains("|".join(map(re.escape, list_strings)), case = st.session_state.FilterCaseSensitivityToggle, na = False)
+  if len(list_strings) != 0:
+    if not st.session_state.FilterOrGateToggle:
+      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
+        case (True, True):
+          for string in list_strings:
+            mask |= column.isin(string)
+        case (True, False):
+          for string in list_strings:
+            mask |= column.str.lower().isin(string.lower())
+        case (False, True) | (False, False):
+          for string in list_strings:
+            mask |= column.str.contains(string, case = st.session_state.FilterCaseSensitiveToggle, na = False)
 
-  if st.session_state.FilterNoneToggle:
+      if not st.session_state.FilterInclusionToggle:
+        mask = ~mask
+
+    else:
+      match (st.session_state.FilterInclusionToggle, st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
+        case (True, True, True):
+          mask |= column.isin(list_strings)
+        case (True, True, False):
+          mask |= column.str.lower().isin([string.lower() for string in list_strings])
+        case (True, False, True) | (True, False, False):
+          mask |= column.str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
+        case (False, True, True):
+          mask |= ~column.isin(list_strings)
+        case (False, True, False):
+          mask |= ~column.str.lower().isin([string.lower() for string in list_strings])
+        case (False, False, True) | (False, False, False):
+          mask |= ~column.str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
+      
+  if not st.session_state.FilterNoneToggle:
     mask |= column.isna()
 
   dataset.filter_owner(filter_col, mask)
@@ -269,8 +271,12 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
     if int_lower_bound:
       mask |= column < int_lower_bound
 
-  if st.session_state.FilterNoneToggle: #! .dropna(subset = replace_col, inplace = True) (?)
+  if not st.session_state.FilterNoneToggle: #! .dropna(subset = replace_col, inplace = True) (?)
     mask |= column.isna()
+
+  # match (st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle):
+  #   case (True, True):
+      
 
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
@@ -288,7 +294,7 @@ def int_values_filter(filter_data_object_index, filter_col, *args):
   else:
     mask |= ~column.isin(int_selections)
 
-  if st.session_state.FilterNoneToggle:
+  if not st.session_state.FilterNoneToggle:
     mask |= column.isna()
 
   dataset.filter_owner(filter_col, mask)
@@ -318,6 +324,7 @@ def date_bounds_filter(filter_data_object_index, filter_col, *args):
       mask |= column < date_earlier_timestamp
     if date_later_bound:
       mask |= column >= date_later_timestamp
+
   if st.session_state.FilterNoneToggle:
     mask |= column.isna()
 

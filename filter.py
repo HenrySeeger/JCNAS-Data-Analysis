@@ -62,12 +62,12 @@ with st.expander(label = "Cleaning"):
           with col:
             if i == 0:
               st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = True, label_visibility = "collapsed")
-            elif i == 1:
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
-            elif i == 2: #! Disable somethings based on this toggle, make removing None entries an option (like what replace/remove used to have)
-              st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = True, label_visibility = "collapsed")
+            elif i == 1: #! Figure out why this None check needs to happen
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterInclusionToggle or st.session_state.FilterInclusionToggle is None else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+            elif i == 2:
+              st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = False, label_visibility = "collapsed")
             else:
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Keep" if st.session_state.FilterNoneToggle else "Remove"} Empty Values</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Remove" if st.session_state.FilterNoneToggle else "Keep"} Empty Values</div>", unsafe_allow_html = True)
 
         #* Filter Button Logic Controls
         disable_filter_button = True
@@ -79,28 +79,34 @@ with st.expander(label = "Cleaning"):
 
           #* String Variable Type
           case pd.StringDtype:
-            for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
+            for i, col in enumerate(st.columns([1, 6.5, 1, 5, 1, 3.5], gap = "xxsmall", border = False)):
               with col:
                 if i == 0:
                   st.toggle(label = "Inlcude", key = "FilterExactStringToggle", value = True, label_visibility = "collapsed")
                 elif i == 1:
                   st.markdown(f"<div style='padding-top: 9.5px;'>{"Matches Exact" if st.session_state.FilterExactStringToggle else "Contains"} Text</div>", unsafe_allow_html = True)
-                elif i == 2: #! Still need to implement case sensitivity
-                  st.toggle(label = "Inlcude", key = "FilterCaseSensitivityToggle", value = True, label_visibility = "collapsed")
+                elif i == 2:
+                  st.toggle(label = "CaseSensitivity", key = "FilterCaseSensitiveToggle", value = True, label_visibility = "collapsed")
+                elif i == 3:
+                  st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.FilterCaseSensitiveToggle else "Insensitive"}</div>", unsafe_allow_html = True)
+                elif i == 4:
+                  st.toggle(label = "AndGating", key = "FilterOrGateToggle", value = False, label_visibility = "collapsed")
                 else:
-                  st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.FilterCaseSensitivityToggle else "Insensitive"}</div>", unsafe_allow_html = True)
+                  st.markdown(f"<div style='padding-top: 9.5px;'>{"And" if st.session_state.FilterOrGateToggle else "Or"}-Gate</div>", unsafe_allow_html = True)
 
             string_selections = st.multiselect(label = "List Text:", options = None, accept_new_options = True, key = "FilterStringSelections")
 
-            disable_filter_button = string_selections == []
+#                                    trying to filter without selected values (None-values included)
+            disable_filter_button = string_selections == [] and not st.session_state.FilterNoneToggle
             filter_function = d.string_filter
             filter_function_args = ((cleaning_data_object_index, cleaning_col, string_selections),
                                     ("filter_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
                                     {"include_values" : st.session_state.FilterInclusionToggle,
-                                    "include_none" : st.session_state.FilterNoneToggle,
-                                    "string_values" : string_selections,
-                                    "exact_string" : st.session_state.FilterExactStringToggle,
-                                    "case_sensitive" : st.session_state.FilterCaseSensitivityToggle})
+                                     "include_none" : st.session_state.FilterNoneToggle,
+                                     "string_values" : string_selections,
+                                     "exact_string" : st.session_state.FilterExactStringToggle,
+                                     "case_sensitive" : st.session_state.FilterCaseSensitiveToggle,
+                                     "and_gate" : st.session_state.FilterOrGateToggle})
 
           #* Integer Variable Type
           case np.dtypes.Int64DType:
@@ -118,10 +124,11 @@ with st.expander(label = "Cleaning"):
               with col4:
                 int_upper_bound = st.number_input(label = "Upper Bound", step = 1, label_visibility = "collapsed", key = "FilterIntUpperBound", width = 200, value = None)
 
-              disable_filter_button = (int_lower_bound is None and int_upper_bound is None) or (int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound)
               if int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound:
                 st.markdown(":red[The lower bound must not be greater than the upper bound.]")
 
+#                                                trying to filter without selected values (None-values included)                                            trying to filter with a lower_bound greater than the upper bound
+              disable_filter_button = (int_lower_bound is None and int_upper_bound is None and not st.session_state.FilterNoneToggle) or (int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound)
               filter_function = d.int_bounds_filter
               filter_function_args = ((cleaning_data_object_index, cleaning_col, int_lower_bound, int_upper_bound),
                                       ("filter_int_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
@@ -135,7 +142,8 @@ with st.expander(label = "Cleaning"):
               int_selections = st.multiselect(label = "List Integers:", options = None, accept_new_options = True, key = "FilterIntSelections")
 
               try:
-                disable_filter_button = False
+#                                       trying to filter without selected values (None-values included)                
+                disable_filter_button = int_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function = d.int_values_filter
                 filter_function_args = ((cleaning_data_object_index, cleaning_col, int_selections),
                                         ("filter_int_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
@@ -147,7 +155,6 @@ with st.expander(label = "Cleaning"):
                   st.markdown(":red[Decimals should not be used, only integers are allowed.]")
                 elif int_selections not in [None, []]:
                   st.markdown(":red[Only integers are allowed.]")
-
                 disable_filter_button = True
 
           #* DateTime Variable Type
@@ -166,10 +173,11 @@ with st.expander(label = "Cleaning"):
               with col4:
                 date_later_bound = st.date_input(label = "Later Date", label_visibility = "collapsed", key = "FilterDateLaterBound", width = 200, value = None)
 
-              disable_filter_button = (date_earlier_bound is None and date_later_bound is None) or (date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound > date_later_bound)
               if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
                 st.markdown(":red[The lower bound must not be greater than the upper bound.]")
 
+#                                                   trying to filter without selected values (None-values included)                                           trying to filter with an earlier date later than the later date
+              disable_filter_button = (date_earlier_bound is None and date_later_bound is None and not st.session_state.FilterNoneToggle) or (date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound > date_later_bound)
               filter_function = d.date_bounds_filter
               filter_function_args = ((cleaning_data_object_index, cleaning_col, date_earlier_bound, date_later_bound),
                                       ("filter_date_bound", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col), 
@@ -183,7 +191,7 @@ with st.expander(label = "Cleaning"):
               date_selections = st.multiselect(label = "List Dates:", options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "FilterDateSelections")
 
               try:
-                disable_filter_button = False
+                disable_filter_button = date_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function = d.date_values_filter
                 filter_function_args = ((cleaning_data_object_index, cleaning_col, date_selections),
                                         ("filter_date_values", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
@@ -220,7 +228,7 @@ with st.expander(label = "Cleaning"):
           st.session_state.data_objects[cleaning_data_object_index].responses.drop(columns = cleaning_col, inplace = True)
 
         st.session_state.data_objects[cleaning_data_object_index].add_action_history("deletion", "both", cleaning_col)
-        st.toast(body = f"Successfully removed '{"address"}' from '{st.session_state.data_objects[cleaning_data_object_index].name}'")
+        st.toast(body = f"Successfully removed '{cleaning_col}' from '{st.session_state.data_objects[cleaning_data_object_index].name}'")
         cleaning_col = "Select a Column"
 
       st.button(f"Remove '{cleaning_col}' from '{st.session_state.data_objects[cleaning_data_object_index].name}'", on_click = delete_column, disabled = not data_delete_confirmation)
@@ -267,8 +275,8 @@ with st.expander(label = "Replacing"):
         for i, col in enumerate(st.columns([1, 17], gap = "xxsmall", border = False)):
           with col:
             if i == 0:
-              st.toggle(label = "label", key = "ReplaceCaseSensitivityToggle", value = True, disabled = True, label_visibility = "collapsed")
-            else: #! Case sensitivity hasn't been implemented
+              st.toggle(label = "label", key = "ReplaceCaseSensitiveToggle", value = True, label_visibility = "collapsed")
+            else:
               st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.ReplaceCaseSensitivityToggle else "Insensitive"}</div>", unsafe_allow_html = True)
 
         for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
@@ -279,7 +287,7 @@ with st.expander(label = "Replacing"):
               string_selections_new = st.multiselect(label = "List New Text:", options = None, accept_new_options = True, key = "ReplaceStringSelectionsNew")
 
 #                                      trying to replace entries without target selections             trying to replace without new selections                 trying to replace entries without an equal number of target and new selections                 trying to replace empty entries without exactly 1 target selection
-        disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_selections_target == []) or (string_selections_new == []) or (not st.session_state.ReplaceNoneToggle and len(string_selections_target) != len(string_selections_new)) or (st.session_state.ReplaceNoneToggle and len(string_selections_new) != 1)
+        disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_selections_target == []) or (string_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(string_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(string_selections_target) != len(string_selections_new)) or (st.session_state.ReplaceNoneToggle and len(string_selections_new) != 1)
         replace_function = d.values_replace
         replace_function_args = ((replace_data_object_index, replace_col, string_selections_target, string_selections_new),
                                  ("replace_string", st.session_state.data_objects[replace_data_object_index].key_owner_name(replace_col), replace_col),
@@ -330,9 +338,9 @@ with st.expander(label = "Replacing"):
 
           try:
 #                                                 trying to replace entries without target integers       trying to replace entries without new values              trying to replace entries without an equal number of target and new selections
-            disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_selections_target == []) or (int_selections_new == []) or (not st.session_state.ReplaceNoneToggle and len(int_selections_target) != len(int_selections_new))
+            disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_selections_target == []) or (int_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(int_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(int_selections_target) != len(int_selections_new))
             replace_function = d.values_replace
-            replace_function_args = ((replace_data_object_index, replace_col, int_selections_target, int_selections_new),
+            replace_function_args = ((replace_data_object_index, replace_col, [int(num) for num in int_selections_target], [int(num) for num in int_selections_new]),
                                     ("replace_int_values", st.session_state.data_objects[replace_data_object_index].key_owner_name(replace_col), replace_col),
                                     {"replace_none" : st.session_state.ReplaceNoneToggle,
                                      "int_target_values" : [int(num) for num in int_selections_target],
@@ -365,7 +373,6 @@ with st.expander(label = "Replacing"):
           if date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound >= date_later_bound:
             st.markdown(":red[The lower bound must be less than the upper bound.]")
 
-          #! Currently no detections for YYYY-MM-DD, should be fine for monthly/daily selections (?)
 #                                                      trying to replace entries without either bound entered                             trying to replace entries without a new value
           disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_earlier_bound == None and date_later_bound == None) or (date_new_bound is None)
           replace_function = d.bounds_replace
@@ -374,8 +381,8 @@ with st.expander(label = "Replacing"):
                                   {"replace_none" : st.session_state.ReplaceNoneToggle,
                                    "include_values" : st.session_state.ReplaceInclusionToggle,
                                    "date_earlier_bound" : date_earlier_bound,
-                                   "date_later_bound" : date_later_bound,
-                                   "date_new_values" : date_new_bound})
+                                   "date_later_bound" : pd.Timestamp(date_earlier_bound),
+                                   "date_new_values" : pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)})
 
       #* List of Dates
         elif date_tabs == "Individual Dates":
@@ -388,9 +395,9 @@ with st.expander(label = "Replacing"):
 
           try:
 #                                                trying to replace entries without target dates          trying to replace entries without new values              trying to replace entries without an equal number of target and new selections              
-            disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (date_selections_new == []) or (not st.session_state.ReplaceNoneToggle and len(date_selections_target) != len(date_selections_new))
+            disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (date_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(date_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(date_selections_target) != len(date_selections_new))
             replace_function = d.values_replace
-            replace_function_args = ((replace_data_object_index, replace_col, date_selections_target, date_selections_new),
+            replace_function_args = ((replace_data_object_index, replace_col, [pd.Timestamp(date) for date in date_selections_target], [pd.Timestamp(date) for date in date_selections_new]),
                                     ("replace_int_values", st.session_state.data_objects[replace_data_object_index].key_owner_name(replace_col), replace_col),
                                     {"replace_none" : st.session_state.ReplaceNoneToggle,
                                      "int_target_values" : [pd.Timestamp(date) for date in date_selections_target],
