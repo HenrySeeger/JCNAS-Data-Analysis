@@ -271,12 +271,8 @@ def int_bounds_filter(filter_data_object_index, filter_col, *args):
     if int_lower_bound:
       mask |= column < int_lower_bound
 
-  if not st.session_state.FilterNoneToggle: #! .dropna(subset = replace_col, inplace = True) (?)
-    mask |= column.isna()
-
-  # match (st.session_state.FilterInclusionToggle, st.session_state.FilterNoneToggle):
-  #   case (True, True):
-      
+  if not st.session_state.FilterNoneToggle:
+    mask |= column.isna()      
 
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")

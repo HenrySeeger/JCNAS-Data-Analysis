@@ -1,3 +1,4 @@
+import re
 import datetime
 import numpy as np
 import pandas as pd
@@ -90,9 +91,9 @@ with st.expander(label = "Cleaning"):
                 elif i == 3:
                   st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.FilterCaseSensitiveToggle else "Insensitive"}</div>", unsafe_allow_html = True)
                 elif i == 4:
-                  st.toggle(label = "AndGating", key = "FilterOrGateToggle", value = False, label_visibility = "collapsed")
+                  st.toggle(label = "OrGating", key = "FilterOrGateToggle", value = True, label_visibility = "collapsed")
                 else:
-                  st.markdown(f"<div style='padding-top: 9.5px;'>{"And" if st.session_state.FilterOrGateToggle else "Or"}-Gate</div>", unsafe_allow_html = True)
+                  st.markdown(f"<div style='padding-top: 9.5px;'>{"Or" if st.session_state.FilterOrGateToggle else "And"}-Gate</div>", unsafe_allow_html = True)
 
             string_selections = st.multiselect(label = "List Text:", options = None, accept_new_options = True, key = "FilterStringSelections")
 
@@ -191,6 +192,9 @@ with st.expander(label = "Cleaning"):
               date_selections = st.multiselect(label = "List Dates:", options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "FilterDateSelections")
 
               try:
+                for date in zip(date_selections):
+                  if not (re.match(r"\d{2}(?:\d{2})/\d{1,2}/\d{1,2}", date)):
+                    raise()
                 disable_filter_button = date_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function = d.date_values_filter
                 filter_function_args = ((cleaning_data_object_index, cleaning_col, date_selections),
@@ -199,7 +203,7 @@ with st.expander(label = "Cleaning"):
                                         "include_none" : st.session_state.FilterNoneToggle,
                                         "date_values" : [pd.Timestamp(date) for date in date_selections]})
               except:
-                st.markdown(":red[Only dates ('YYYY-MM-DD') are allowed.]")
+                st.markdown(":red[Only dates ('YYYY/MM/DD') are allowed.]")
                 disable_filter_button = True
 
         def filter_on_click(*args):
@@ -277,7 +281,7 @@ with st.expander(label = "Replacing"):
             if i == 0:
               st.toggle(label = "label", key = "ReplaceCaseSensitiveToggle", value = True, label_visibility = "collapsed")
             else:
-              st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.ReplaceCaseSensitivityToggle else "Insensitive"}</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.ReplaceCaseSensitiveToggle else "Insensitive"}</div>", unsafe_allow_html = True)
 
         for i, col in enumerate(st.columns([1, 1], gap = "xxsmall", border = False)):
           with col:
@@ -394,6 +398,9 @@ with st.expander(label = "Replacing"):
                 date_selections_new = st.multiselect(label = "List New Dates:", options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "ReplaceDateAreaNew")
 
           try:
+            for target, new in zip(date_selections_target, date_selections_new):
+              if not (re.match(r"\d{2}(?:\d{2})/\d{1,2}/\d{1,2}", target) or re.match(r"\d{2}(?:\d{2})/\d{1,2}/\d{1,2}", new)):
+                raise()
 #                                                trying to replace entries without target dates          trying to replace entries without new values              trying to replace entries without an equal number of target and new selections              
             disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (date_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(date_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(date_selections_target) != len(date_selections_new))
             replace_function = d.values_replace
