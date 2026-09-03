@@ -5,5 +5,7 @@ import matplotlib.pyplot as plt
 
 st.header("How to Use and FAQs")
 
-with st.expander(label = "What is a 'DataObject'"):
-  st.text("")
+st.text("Coming in v2.0")
+
+# with st.expander(label = "What is a 'DataObject'"):
+#   st.text("")

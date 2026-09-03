@@ -428,7 +428,7 @@ with st.expander(label = "Replacing"):
     st.button(label = f"Replace Value(s)", disabled = disable_replace_button, on_click = replace_on_click, args = replace_function_args)
 
 with st.expander(label = "Merging"):
-  st.text("stuff")
+  st.text("Coming in v2.0")
 
 # with st.expander(label = "Manual Filtering"):
 #   manual_dataset = st.selectbox(label = "Select a Data Object", options = ["No Selection", "option2"])
