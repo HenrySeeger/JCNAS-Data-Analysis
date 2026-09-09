@@ -29,9 +29,9 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
   with col2:
     data_object_index = st.multiselect(label = "Select an X-Axis Data Object", options = list(range(len(st.session_state.data_objects))), label_visibility = "collapsed", default = None, format_func = select_object_format)
   
-  #* Variable and Label Selection
   with st.expander(label = "x-axis"):
-    col1, col2, col3, col4 = st.columns([2, 4, 1.25, 4.75], gap = None)
+    #* Variable and Label Selection
+    col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Variable:</div>", unsafe_allow_html = True)
     with col2:
@@ -81,6 +81,39 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
     # with col4:
     #   x_axis_right_lim = st.number_input(label = "x_axis right lim", label_visibility = "collapsed", value = None)
 
+if st.session_state.GraphTypeSelect in ["Bar Plot"]:
+  with st.expander(label = "Bars/Bins"):
+    #* Bin Fill Color
+    col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Entry Type:</div>", unsafe_allow_html = True)
+    with col2:
+      bin_fill_colors_entry_type = st.selectbox(label = "bin__fill_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Multiple Entry", "Color Map Entry"])
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Color:</div>", unsafe_allow_html = True)
+    with col4:
+      if bin_fill_colors_entry_type == "Single Entry":
+        bin_fill_colors = st.color_picker(label = "Fill Colors", label_visibility = "collapsed", value = None)
+      if bin_fill_colors_entry_type == "Multiple Entry":
+        bin_fill_colors = st.multiselect(label = "Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
+      if bin_fill_colors_entry_type == "Color Map Entry":
+        bin_fill_colors = st.text_input(label = "Fill Colors", label_visibility = "collapsed", value = None)
+
+    #* Bin Edge Color
+    col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Entry Type:</div>", unsafe_allow_html = True)
+    with col2:
+      bin_edge_colors_entry_type = st.selectbox(label = "bin_edge_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Multiple Entry", "Color Map Entry"])
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Edge Color:</div>", unsafe_allow_html = True)
+    with col4:
+      if bin_edge_colors_entry_type == "Single Entry":
+        bin_edge_colors = st.color_picker(label = "Edge Colors", label_visibility = "collapsed", value = None)
+      if bin_edge_colors_entry_type == "Multiple Entry":
+        bin_edge_colors = st.multiselect(label = "Edge Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
+      if bin_edge_colors_entry_type == "Color Map Entry":
+        bin_edge_colors = st.text_input(label = "Edge Colors", label_visibility = "collapsed", value = None)
 
 match st.session_state.GraphTypeSelect:
   case "Bar Plot":
