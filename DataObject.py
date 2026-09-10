@@ -1,4 +1,5 @@
 import re
+import sys
 import copy
 import pandas as pd
 import streamlit as st
@@ -345,3 +346,148 @@ def date_values_filter(filter_data_object_index, filter_col, *args):
 
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
+
+
+def period_or_date_to_charities(df):
+  def normalize_period(col):
+    col = col.fillna("")
+    col = col.str.strip()
+
+    # HTML entities that appear in the source
+    col = col.str.replace(r"&amp;", "&", regex = True)
+    col = col.str.replace(r"&#039;", "'", regex = True)
+
+    # Normalize whitespace
+    col = col.str.replace(r"\s+", " ", regex = True)
+
+    # Common inconsistencies or apparent OCR errors
+    col = col.str.replace(r"\bCl(\d)", r"C1\1", regex = True)     # Cl9  -> C19
+    col = col.str.replace(r"\bl(\d{3})", r"1\1", regex = True)    # l851 -> 1851
+    col = col.str.replace(r"\bI(\d{3})", r"1\1", regex = True)    # I800 -> 1800
+    col = col.str.replace(r"\b(\d{3})O\b", r"\g<1>0", regex = True)  # 184O -> 1840
+    col = col.str.replace(r"\b(\d{4}s*[-–]\s*\d{1,3})O\b", r"\g<1>0", regex = True)  # 185O-6O -> 1850-60
+    col = col.str.replace(r"\bC\s+(\d{1,2})", r"C\1", regex = True, flags=re.I) # C 17 -> C17
+
+    return col
+
+  def expand_year_range(range_text):
+    start_text, end_text = re.split(r"\s*[-–]\s*", range_text)
+
+    end_is_bc = "bc" in end_text
+    start_is_bc = "bc" in start_text or end_is_bc
+
+    start_text = start_text.replace("bc", "")
+    end_text = end_text.replace("bc", "")
+
+    start = int(start_text) * (-1 if start_is_bc else 1)
+    end = int(end_text) * (-1 if end_is_bc else 1)
+
+    if len(end_text) < len(start_text):
+      end = int(start_text[:len(start_text) - len(end_text)] + end_text)
+
+    return [start, end]
+
+  def cent_to_range(century, is_bc):
+    if is_bc:
+      century[1] *= -1
+    match century[0]:
+      case "early":
+        century = [century[1], century[1] + 33]
+      case "mid":
+        century = [century[1] + 33, century[1] + 66]
+      case "late":
+        century = [century[1] + 66, century[1] + 99]
+      case "early-mid":
+        century = [century[1] + 17, century[1] + 50]
+      case "mid-late":
+        century = [century[1] + 50, century[1] + 83]
+      case "":
+        century = [century[1], century[1] + 99]
+    if is_bc:
+      century[0] *= -1
+      century[1] *= -1
+    return century
+
+  df['period_or_date'] = normalize_period(df['period_or_date'])
+
+  patterns = {"range" : r"\b(?:ad|bc)?\d{2,4}(?:ad|bc)?\s*[-–]\s*(?:ad|bc)?\d{1,4}\s*(?:ad|bc)?\b",
+              "approx" : r"\b(?:c\.?|circa|about)\s*\d{3,4}(?:|ad|bc)?\b",
+              "decade" : r"\bc?(\d{3,4}s)\b",
+              "century" : r"(?<![-\d.])\b(?P<qualifier>early[-\s]*mid|mid[-\s]*late|early|mid|late|)\s*(?P<century>c?\s*\d{1,2}c?(?:st|nd|rd|th)?c?|\d{1,2}(?:st|nd|rd|th)\s+centur(?:y|ies))\s*-?\s*(?P<period>bc)?\b",
+              "year" : r"\b(?<!-)\d{3,4}\b(?!\s*-\s*\d)",
+              "other" : r"media?eval|pre[\s-]?media?eval|georgian|victorian|edwardian|anglo[\s-]?saxon|iron[\s-]?age|neolithic|prehistoric|roman|modern|bronze[\s-]?age|post[\s-]?war|middle[\s-]?ages?|norman"}#|archaeolog(?:ical|y)"}
+
+  # Create DataFrame of extracted text
+  merged_df = pd.DataFrame({"period_or_date" : df["period_or_date"]} | {key : df["period_or_date"].str.findall(value, re.IGNORECASE) for key, value in patterns.items()})
+
+  # Standardizes the century column qualifiers and converts year text to an int which is the first year of the century (e.g. ["Early Mid", "C18"] -> ["early-mid", 1700])
+  merged_df["century"] = merged_df["century"].map(lambda centuries: [[re.sub(r"[\s-]+", "-", century[0].lower()), (1 if century[2] == "" else -1) * (int(re.search(r"\d{1,2}", century[1]).group()) * 100 - 100)] for century in centuries])
+
+  # Removes any version of 'ad' (as in 'AD or 'BC') from the ranges
+  merged_df["range"] = merged_df["range"].map(lambda ranges: [range.lower().replace("ad", "").replace(" ", "") for range in ranges])
+
+  # Put into the 'range' column        range text -> int range                               decade text -> int range                                   century+qualifier text -> int range
+  merged_df["range"] = [[expand_year_range(range) for range in ranges] + [[int(decade[:-1]), int(decade[:-2]) * 10 + 9] for decade in decades] + [cent_to_range(century, century[1] < 0) for century in centuries] for ranges, decades, centuries in zip(merged_df["range"], merged_df["decade"], merged_df["century"])]
+  merged_df.drop(columns = ["decade"], inplace = True)
+  merged_df.drop(columns = ["century"], inplace = True)
+
+  # Puts approximations into years and uses sets (briefly) to ensure there aren't duplicates
+  merged_df["year"] = [list(set([int(year) for year in years] + [(-1 if "bc" in approx.lower() else 1) * int(re.search(r"\d{3,4}", approx)[0]) for approx in approxes])) for years, approxes in zip(merged_df["year"], merged_df["approx"])]
+  merged_df.drop(columns = ["approx"], inplace = True)
+
+  # Replace all ' ' with '-' in the 'other' column
+  merged_df["other"] = merged_df["other"].map(lambda others: [other.lower().replace(" ", "-") for other in others])
+
+  charity_bounds = pd.DataFrame({"charity" : ["spab", "georgian", "victorian", "c20"],
+                                 "bounds"  : [[-sys.maxsize - 1, 1720], [1715, 1840], [1837, 1914], [1913, sys.maxsize]]})
+
+  time_period_reference_table = {"neolithic" : ["spab"],
+                                 "iron-age" : ["spab"],
+                                 "bronze-age" : ["spab"],
+                                 "prehistoric" : ["spab"],
+                                 "roman" : ["spab"],
+                                 "pre-medieval" : ["spab"],
+                                 "pre-mediaeval" : ["spab"],
+                                 "medieval" : ["spab"],
+                                 "mediaeval" : ["spab"],
+                                 "norman" : ["spab"],
+                                 "middle-ages" : ["spab"],
+                                 "anglo-saxon" : ["spab"],
+                                 "georgian" : ["georgian"],
+                                 "victorian" : ["victorian"],
+                                 "edwardian" : ["victorian"],
+                                 "postwar" : ["c20"],
+                                 "post-war" : ["c20"],
+                                 "modern" : ["c20"]}
+
+  for charity, bounds in zip(charity_bounds["charity"], charity_bounds["bounds"]):
+    merged_df[charity] = [[charity] if [range for range in ranges if range[0] < bounds[1] and range[1] > bounds[0]] or
+                                       [year for year in years if bounds[0] < year and year < bounds[1]] or
+                                       [other for other in others if charity in time_period_reference_table[other.lower()]] else []
+                          for ranges, years, others in zip(merged_df["range"], merged_df["year"], merged_df["other"])]
+
+  df["charities"] = [s + g + v + c for g, s, v, c in zip(merged_df["spab"], merged_df["georgian"], merged_df["victorian"], merged_df["c20"])]
+
+def green_keywords(df):
+  green_terms_table = {"climate_change_adaptation" : r"climate[-\s]resilience|climate[-\s]adaptation|adaptation[-\s]measures|resilience[-\s]measures|future[-\s]proofing|flood[-\s]resilience|flood[-\s]resistance|overheating[-\s]mitigation|thermal[-\s]comfort|sustainable[-\s]drainage|rainwater[-\s]management|surface[-\s]water[-\s]management|water[-\s]efficiency|drought[-\s]resilience|green[-\s]infrastructure|biodiversity[-\s]enhancement|nature[-\s]based[-\s]solutions",
+                       "energy_efficiency" : r"energy[-\s]efficiency[-\s]improvements|thermal[-\s]upgrade|fabric[-\s]first[-\s]approach|building[-\s]fabric[-\s]improvements|insulation|secondary[-\s]glazing|draught[-\s]proofing|airtightness|heat[-\s]loss[-\s]reduction|thermal[-\s]performance|u[-\s]value|building[-\s]performance|energy[-\s]demand[-\s]reduction|retrofit|sensitive[-\s]retrofit|deep[-\s]retrofit|whole[-\s]building[-\s]retrofit",
+                       "decarbonisation" : r"decarboni[sz]ation|net[-\s]zero|low[-\s]carbon|zero[-\s]carbon|carbon[-\s]reduction|carbon[-\s]emissions|operational[-\s]carbon|embodied[-\s]carbon|whole[-\s]life[-\s]carbon|carbon[-\s]footprint|carbon[-\s]savings|carbon[-\s]neutral|carbon[-\s]assessment",
+                       "renewable_energy" : r"solar[-\s]pv|solar[-\s]panels|solar[-\s]slates|solar[-\s]roof[-\s]tiles|air[-\s]source[-\s]heat[-\s]pump|ground[-\s]source[-\s]heat[-\s]pump|heat[-\s]network|renewable[-\s]energy|low[-\s]carbon[-\s]heating|clean[-\s]energy|battery[-\s]storage|electric[-\s]vehicle[-\s]charging",
+                       "heritage_and_conservation_langauge" : r"heritage[-\s]significance|significance|conservation[-\s]led[-\s]approach|minimal[-\s]intervention|reversible[-\s]intervention|like[-\s]for[-\s]like[-\s]repair|sensitive[-\s]alteration|heritage[-\s]impact|conservation[-\s]principles|historic[-\s]fabric|fabric[-\s]retention|less[-\s]than[-\s]substantial[-\s]harm|public[-\s]benefits|sustainable[-\s]conservation",
+                       "sustainability" : r"sustainable[-\s]development|environmental[-\s]sustainability|sustainable[-\s]design|circular[-\s]economy|reuse|repair|longevity|durability|resource[-\s]efficiency|life[-\s]cycle[-\s]assessment|sustainable[-\s]materials|natural[-\s]materials|low[-\s]impact[-\s]development",
+                       "policy_references" : r"climate[-\s]emergency|net[-\s]zero[-\s]strategy|local[-\s]plan[-\s]climate[-\s]policies|national[-\s]planning[-\s]policy[-\s]framework|nppf|historic[-\s]england[-\s]guidance|pas[-\s]2035[-\s](retrofit)|energy[-\s]performance[-\s]certificate|epc|whole[-\s]house[-\s]plan",
+                       "general_accessibility" : r"accessibility|improved[-\s]access|inclusive[-\s]access|inclusive[-\s]design|equal[-\s]access|universal[-\s]design|step[-\s]free[-\s]access|accessible[-\s]entrance|improved[-\s]circulation|enhanced[-\s]accessibility|improved[-\s]usability|accessible[-\s]route|barrier[-\s]free[-\s]access|ease[-\s]of[-\s]access|access[-\s]improvements",
+                       "physical_alterations" : r"ramp|access[-\s]ramp|platform[-\s]lift|passenger[-\s]lift|wheelchair[-\s]lift|stair[-\s]lift|new[-\s]lift[-\s]shaft|level[-\s]threshold|dropped[-\s]kerb|handrails|guardrails|new[-\s]steps|wider[-\s]doorway|automatic[-\s]doors|power[-\s]assisted[-\s]doors|entrance[-\s]alterations|new[-\s]entrance|accessible[-\s]wc|changing[-\s]places[-\s]toilet|internal[-\s]reconfiguration|wayfinding|signage|tactile[-\s]paving|tactile[-\s]signage|hearing[-\s]loop|automatic[-\s]opening[-\s]system",
+                       "disability_and_inclusion" : r"disabled[-\s]access|wheelchair[-\s]access|mobility[-\s]impaired|people[-\s]with[-\s]disabilities|inclusive[-\s]environment|accessibility[-\s]for[-\s]all|independent[-\s]access|equal[-\s]opportunities|dementia[-\s]friendly|neurodiverse[-\s]users|visual[-\s]impairment|hearing[-\s]impairment",
+                       "legislation_and_guidance" : r"equality[-\s]act[-\s]2010|approved[-\s]document[-\s]m|building[-\s]regulations[-\s]part[-\s]m|bs[-\s]8300|inclusive[-\s]design[-\s]guidance|historic[-\s]england[-\s]guidance[-\s]on[-\s]improving[-\s]access|access[-\s]statement|design[-\s]and[-\s]access[-\s]statement",
+                       "heritage_language" : r"sensitive[-\s]intervention|minimal[-\s]intervention|reversible[-\s]works|heritage[-\s]significance|conservation[-\s]led[-\s]design|historic[-\s]fabric|less[-\s]than[-\s]substantial[-\s]harm|public[-\s]benefit|balanced[-\s]approach|proportionate[-\s]response",
+                       "home_improvement_and_quality_of_life" : r"improved[-\s]living[-\s]accommodation|enhanced[-\s]living[-\s]conditions|improved[-\s]quality[-\s]of[-\s]life|better[-\s]use[-\s]of[-\s]space|modernisation|improved[-\s]functionality|contemporary[-\s]living|flexible[-\s]living|family[-\s]living|open[-\s]plan[-\s]living|adaptation[-\s]to[-\s]modern[-\s]living|better[-\s]circulation|improved[-\s]layout|rationalised[-\s]layout|increased[-\s]comfort|enhanced[-\s]amenity|increased[-\s]enjoyment[-\s]of[-\s]the[-\s]property",
+                       "growing_or_changing_families" : r"family[-\s]needs|growing[-\s]family|additional[-\s]accommodation|extra[-\s]bedroom|home[-\s]office|study|playroom|multi[-\s]functional[-\s]space|flexible[-\s]accommodation|multi[-\s]generational[-\s]living|independent[-\s]living|annex|adaptable[-\s]accommodation|lifetime[-\s]home",
+                       "health_and_wellbeing" : r"wellbeing|health[-\s]and[-\s]wellbeing|improved[-\s]natural[-\s]light|daylighting|ventilation|improved[-\s]ventilation|better[-\s]outlook|garden[-\s]access|outdoor[-\s]living|private[-\s]amenity[-\s]space|connection[-\s]to[-\s]the[-\s]garden|improved[-\s]comfort|reduced[-\s]overheating|quiet[-\s]enjoyment",
+                       "ageing_and_future_needs" : r"future[-\s]proofing|lifetime[-\s]living|ageing[-\s]in[-\s]place|accessible[-\s]accommodation|adaptable[-\s]home|single[-\s]storey[-\s]living|ground[-\s]floor[-\s]bedroom|ground[-\s]floor[-\s]bathroom|mobility[-\s]needs",
+                       "leisure_and_lifestyle" : r"garden[-\s]room|conservatory|orangery|outdoor[-\s]entertaining|home[-\s]gym|hobby[-\s]room|cinema[-\s]room|recreation|lifestyle[-\s]enhancement",
+                       "working_from_home" : r"home[-\s]office|remote[-\s]working|hybrid[-\s]working|dedicated[-\s]workspace|workspace|home[-\s]working|flexible[-\s]workspace",
+                       "energy_and_comfort" : r"improved[-\s]thermal[-\s]comfort|energy[-\s]efficiency|reduced[-\s]energy[-\s]bills|increased[-\s]comfort|improved[-\s]indoor[-\s]environment|sustainable[-\s]living"}
+
+  df["green_keywords"] = [[category for category, pattern in green_terms_table.items() if re.search(pattern, text, flags = re.IGNORECASE)] for text in df["fdescription"]]
+

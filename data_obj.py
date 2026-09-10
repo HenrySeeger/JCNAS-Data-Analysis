@@ -124,7 +124,7 @@ with st.expander(label = "Manage Data Objects"):
                                             disabled = len(st.session_state.data_objects) == 0)
   
   data_manager_options = st.selectbox(label = "Manage Options",
-                                      options = ["No Selection", "Delete", "Rename"],
+                                      options = ["No Selection", "Delete", "Rename", "Period/Date to Charity", "Climate Change Keywords"],
                                       key = "DataManagerOptions",
                                       disabled = len(st.session_state.data_objects) == 0 or data_manager_data_selector == "No Selection")
 
@@ -158,6 +158,21 @@ with st.expander(label = "Manage Data Objects"):
             st.session_state.DataManagerDataSelector = "No Selection"
             st.session_state.DataManagerOptions = "No Selection"
           st.button(label = "Rename", on_click = rename_data, args = (data_manager_data_selector.name,))
+      case "Period/Date to Charity":
+        def temp():
+          d.period_or_date_to_charities(st.session_state.DataManagerDataSelector.applications)
+          st.session_state.DataManagerDataSelector.add_action_history("period_date_to_charity", "applications", "period_or_date")
+          st.toast(f"Applied Period/Date -> Charity Algorithm to '{st.session_state.DataManagerDataSelector.name}'")
+          st.session_state.DataManagerDataSelector = "No Selection"
+          st.session_state.DataManagerOptions = "No Selection"
+        st.button("Assign Charities", on_click=temp)
+      case "Climate Change Keywords":
+        if st.button("Detect Keywords"):
+          d.green_keywords(st.session_state.DataManagerDataSelector.applications)
+          st.session_state.DataManagerDataSelector.add_action_history("climate_change_keywords", "applications", "description")
+          st.toast(f"Detected Climate Change Keywords in '{st.session_state.DataManagerDataSelector.name}'")
+          st.session_state.DataManagerDataSelector = "No Selection"
+          st.session_state.DataManagerOptions = "No Selection"
   else:
     data_manager_options = "No Selection"
 

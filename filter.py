@@ -40,22 +40,22 @@ with st.expander(label = "Cleaning"):
             initial = len(st.session_state.data_objects[cleaning_data_object_index].applications)
             st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].applications)} duplicate values")
-            st.session_state.data_objects[cleaning_data_object_index].add_action_history("duplicates", "applications", cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].add_action_history("drop_duplicates", "applications", cleaning_col)
           case (False, True): # column in responses dataset
             initial = len(st.session_state.data_objects[cleaning_data_object_index].responses)
             st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed {initial - len(st.session_state.data_objects[cleaning_data_object_index].responses)} duplicate values")
-            st.session_state.data_objects[cleaning_data_object_index].add_action_history("duplicates", "responses", cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].add_action_history("drop_duplicates", "responses", cleaning_col)
           case (True, True): # column in both datasets
             st.session_state.data_objects[cleaning_data_object_index].applications.drop_duplicates(subset = cleaning_col, inplace = True)
             st.session_state.data_objects[cleaning_data_object_index].responses.drop_duplicates(subset = cleaning_col, inplace = True)
             st.toast(body = f"Successfully removed duplicate values")
-            st.session_state.data_objects[cleaning_data_object_index].add_action_history("duplicates", "both", cleaning_col)
+            st.session_state.data_objects[cleaning_data_object_index].add_action_history("drop_duplicates", "both", cleaning_col)
         cleaning_col = "Select a Column"
 
       st.button(label = "Remove Duplicates", on_click = remove_duplicates)
 
-    #* Filter Values replace
+    #* Filter Values
     with tab_filter:
       #* Inclusion/Exclusion & None Inclusion toggles
       if cleaning_col not in [None, "Select a Column"]:
@@ -63,7 +63,7 @@ with st.expander(label = "Cleaning"):
           with col:
             if i == 0:
               st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = True, label_visibility = "collapsed")
-            elif i == 1: #! Figure out why this None check needs to happen
+            elif i == 1:                                                               #! Figure out why this None check needs to happen
               st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterInclusionToggle or st.session_state.FilterInclusionToggle is None else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
             elif i == 2:
               st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = False, label_visibility = "collapsed")
