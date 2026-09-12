@@ -1,6 +1,7 @@
 import re
 import sys
 import copy
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -216,36 +217,31 @@ def string_filter(filter_data_object_index, filter_col, *args):
   mask = pd.Series(False, index = column.index)
 
   if len(list_strings) != 0:
-    if not st.session_state.FilterOrGateToggle:
+    if st.session_state.FilterOrGateToggle:
+      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
+        case (True, True):
+          mask |= column.isin(list_strings)
+        case (True, False):
+          mask |= column.str.lower().isin([string.lower() for string in list_strings])
+        case (False, True) | (False, False):
+          mask |= column.str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
+    else:
       match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
         case (True, True):
           for string in list_strings:
-            mask |= column.isin(string)
+            mask &= column.isin(string)
         case (True, False):
           for string in list_strings:
-            mask |= column.str.lower().isin(string.lower())
+            mask &= column.str.lower().isin(string.lower())
         case (False, True) | (False, False):
           for string in list_strings:
-            mask |= column.str.contains(string, case = st.session_state.FilterCaseSensitiveToggle, na = False)
+            mask &= column.str.contains(string, case = st.session_state.FilterCaseSensitiveToggle, na = False)
 
-      if not st.session_state.FilterInclusionToggle:
-        mask = ~mask
+    if not st.session_state.FilterInclusionToggle:
+      mask = ~mask
+  else:
+    mask |= ~column.isna()
 
-    else:
-      match (st.session_state.FilterInclusionToggle, st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
-        case (True, True, True):
-          mask |= column.isin(list_strings)
-        case (True, True, False):
-          mask |= column.str.lower().isin([string.lower() for string in list_strings])
-        case (True, False, True) | (True, False, False):
-          mask |= column.str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
-        case (False, True, True):
-          mask |= ~column.isin(list_strings)
-        case (False, True, False):
-          mask |= ~column.str.lower().isin([string.lower() for string in list_strings])
-        case (False, False, True) | (False, False, False):
-          mask |= ~column.str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
-      
   if not st.session_state.FilterNoneToggle:
     mask |= column.isna()
 
@@ -442,20 +438,21 @@ def period_or_date_to_charities(df):
                                  "bounds"  : [[-sys.maxsize - 1, 1720], [1715, 1840], [1837, 1914], [1913, sys.maxsize]]})
 
   time_period_reference_table = {"neolithic" : ["spab"],
-                                 "iron-age" : ["spab"],
+                                 "iron-age" : ["cba", "hbap"],
                                  "bronze-age" : ["spab"],
                                  "prehistoric" : ["spab"],
                                  "roman" : ["spab"],
-                                 "pre-medieval" : ["spab"],
-                                 "pre-mediaeval" : ["spab"],
-                                 "medieval" : ["spab"],
-                                 "mediaeval" : ["spab"],
+                                 "pre-medieval" : ["hbap", "spab"],
+                                 "pre-mediaeval" : ["hbap", "spab"],
+                                 "medieval" : ["cba", "hbap", "spab"],
+                                 "mediaeval" : ["cba", "hbap", "spab"],
                                  "norman" : ["spab"],
                                  "middle-ages" : ["spab"],
-                                 "anglo-saxon" : ["spab"],
+                                 "anglo-saxon" : ["cba", "hbap"],
+                                 "anglosaxon" : ["cba", "hbap"],
                                  "georgian" : ["georgian"],
                                  "victorian" : ["victorian"],
-                                 "edwardian" : ["victorian"],
+                                 "edwardian" : ["hbap", "victorian"],
                                  "postwar" : ["c20"],
                                  "post-war" : ["c20"],
                                  "modern" : ["c20"]}
@@ -467,6 +464,10 @@ def period_or_date_to_charities(df):
                           for ranges, years, others in zip(merged_df["range"], merged_df["year"], merged_df["other"])]
 
   df["charities"] = [s + g + v + c for g, s, v, c in zip(merged_df["spab"], merged_df["georgian"], merged_df["victorian"], merged_df["c20"])]
+
+  #* Adds the Gardens Trust
+                                                #! Figure out why ==None, np.nan, float("nan"), np.isna() weren't working
+  df["charities"] = pd.Series([charities + (["gardens_trust"] if type(park_or_garden) == str else []) for charities, park_or_garden in zip(df["charities"], df["park_or_garden"])])
 
 def green_keywords(df):
   green_terms_table = {"climate_change_adaptation" : r"climate[-\s]resilience|climate[-\s]adaptation|adaptation[-\s]measures|resilience[-\s]measures|future[-\s]proofing|flood[-\s]resilience|flood[-\s]resistance|overheating[-\s]mitigation|thermal[-\s]comfort|sustainable[-\s]drainage|rainwater[-\s]management|surface[-\s]water[-\s]management|water[-\s]efficiency|drought[-\s]resilience|green[-\s]infrastructure|biodiversity[-\s]enhancement|nature[-\s]based[-\s]solutions",

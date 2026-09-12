@@ -64,7 +64,7 @@ with st.expander(label = "Cleaning"):
             if i == 0:
               st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = True, label_visibility = "collapsed")
             elif i == 1:                                                               #! Figure out why this None check needs to happen
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.FilterInclusionToggle or st.session_state.FilterInclusionToggle is None else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Keep" if st.session_state.FilterInclusionToggle or st.session_state.FilterInclusionToggle is None else "Remove"} Selected Bounds/Values</div>", unsafe_allow_html = True)
             elif i == 2:
               st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = False, label_visibility = "collapsed")
             else:
@@ -97,8 +97,7 @@ with st.expander(label = "Cleaning"):
 
             string_selections = st.multiselect(label = "List Text:", options = None, accept_new_options = True, key = "FilterStringSelections")
 
-#                                    trying to filter without selected values (None-values included)
-            disable_filter_button = string_selections == [] and not st.session_state.FilterNoneToggle
+            disable_filter_button = False
             filter_function = d.string_filter
             filter_function_args = ((cleaning_data_object_index, cleaning_col, string_selections),
                                     ("filter_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
