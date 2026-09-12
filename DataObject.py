@@ -33,6 +33,8 @@ class DataObject:
   def __init__(self, name, applications, responses):
     self.name = name
     self.applications = datesToDatetime(applications)
+    if type(self.applications["grade"].dtype) == pd.StringDtype:
+      self.applications["grade"] = self.applications["grade"].map(lambda val: [split_val.strip() for split_val in val.split(";")] if type(val) == str else [])
     self.responses = datesToDatetime(responses)
     self.action_history = [] # Each element in the list is {"filter_code" : filter_code, "dataset" : dataset, "column" : column, "include_values" : include_values, "include_None" : include_none} + additional kwargs
   
@@ -214,7 +216,7 @@ def string_filter(filter_data_object_index, filter_col, *args):
   column = dataset.key_owner(filter_col)[0][filter_col]
   st.session_state.FilterStringSelections = []
   list_strings, = args
-  mask = pd.Series(False, index = column.index)
+  mask = pd.Series(False if st.session_state.FilterOrGateToggle else True, index = column.index)
 
   if len(list_strings) != 0:
     if st.session_state.FilterOrGateToggle:
@@ -244,6 +246,47 @@ def string_filter(filter_data_object_index, filter_col, *args):
 
   if not st.session_state.FilterNoneToggle:
     mask |= column.isna()
+
+  dataset.filter_owner(filter_col, mask)
+  st.toast(body = f"'{dataset.name}' successfully filtered")
+
+def list_string_filter(filter_data_object_index, filter_col, *args):
+  dataset = st.session_state.data_objects[filter_data_object_index]
+  column = dataset.key_owner(filter_col)[0][filter_col]
+  st.session_state.FilterStringSelections = []
+  list_strings, = args
+  mask = pd.Series(False if st.session_state.FilterOrGateToggle else True, index = column.index)
+
+  if len(list_strings) != 0:
+    if st.session_state.FilterOrGateToggle:
+      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
+        case (True, True):
+          mask |= pd.Series([bool([string for string in list_strings if string in vals]) for vals in column])
+        case (True, False):
+          list_strings_lower = [string.lower() for string in list_strings]
+          mask |= pd.Series([bool([string for string in list_strings_lower if string in vals]) for vals in column.str.lower()])
+        case (False, True) | (False, False):
+          mask |= column.map(lambda items: ";;".join(items)).str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
+    else:
+      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
+        case (True, True):
+          for string in list_strings:
+            mask &= pd.Series([string in vals for vals in column])
+        case (True, False):
+          for string in [string.lower() for string in list_strings]:
+            mask &= pd.Series([string in vals for vals in column.str.lower()])
+        case (False, True) | (False, False):
+          temp_column = column.copy().map(lambda items: ";;".join(items))
+          for string in list_strings:
+            mask &= temp_column.str.contains(string, case = st.session_state.FilterCaseSensitiveToggle, na = False)
+
+    if not st.session_state.FilterInclusionToggle:
+      mask = ~mask
+  else:
+    mask |= column.str.len() != 0
+
+  if not st.session_state.FilterNoneToggle:
+    mask |= column.str.len() == 0
 
   dataset.filter_owner(filter_col, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")

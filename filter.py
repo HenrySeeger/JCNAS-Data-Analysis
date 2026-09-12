@@ -62,9 +62,9 @@ with st.expander(label = "Cleaning"):
         for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
           with col:
             if i == 0:
-              st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = True, label_visibility = "collapsed")
-            elif i == 1:                                                               #! Figure out why this None check needs to happen
-              st.markdown(f"<div style='padding-top: 9.5px;'>{"Keep" if st.session_state.FilterInclusionToggle or st.session_state.FilterInclusionToggle is None else "Remove"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+              st.toggle(label = "Inlcude", key = "FilterInclusionToggle", value = False, label_visibility = "collapsed")
+            elif i == 1:
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Keep" if st.session_state.FilterInclusionToggle else "Remove"} Selected Bounds/Values</div>", unsafe_allow_html = True)
             elif i == 2:
               st.toggle(label = "Inlcude", key = "FilterNoneToggle", value = False, label_visibility = "collapsed")
             else:
@@ -79,7 +79,8 @@ with st.expander(label = "Cleaning"):
         match type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]):
 
           #* String Variable Type
-          case pd.StringDtype:
+          case pd.StringDtype | np.dtypes.ObjectDType:
+            is_str = type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]) == pd.StringDtype
             for i, col in enumerate(st.columns([1, 6.5, 1, 5, 1, 3.5], gap = "xxsmall", border = False)):
               with col:
                 if i == 0:
@@ -98,9 +99,9 @@ with st.expander(label = "Cleaning"):
             string_selections = st.multiselect(label = "List Text:", options = None, accept_new_options = True, key = "FilterStringSelections")
 
             disable_filter_button = False
-            filter_function = d.string_filter
+            filter_function = d.string_filter if is_str else d.list_string_filter
             filter_function_args = ((cleaning_data_object_index, cleaning_col, string_selections),
-                                    ("filter_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
+                                    ("filter_string" if is_str else "filter_list_string", st.session_state.data_objects[cleaning_data_object_index].key_owner_name(cleaning_col), cleaning_col),
                                     {"include_values" : st.session_state.FilterInclusionToggle,
                                      "include_none" : st.session_state.FilterNoneToggle,
                                      "string_values" : string_selections,
@@ -204,6 +205,9 @@ with st.expander(label = "Cleaning"):
               except:
                 st.markdown(":red[Only dates ('YYYY/MM/DD') are allowed.]")
                 disable_filter_button = True
+
+          # case np.dtypes.ObjectDType:
+          #   st.text("list")
 
         def filter_on_click(*args):
           """
