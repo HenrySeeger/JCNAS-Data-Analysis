@@ -206,9 +206,6 @@ with st.expander(label = "Cleaning"):
                 st.markdown(":red[Only dates ('YYYY/MM/DD') are allowed.]")
                 disable_filter_button = True
 
-          # case np.dtypes.ObjectDType:
-          #   st.text("list")
-
         def filter_on_click(*args):
           """
             Updates the DataObject's action history. It also updates the other datasets that weren't directly filtered

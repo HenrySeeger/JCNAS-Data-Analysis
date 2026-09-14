@@ -159,20 +159,21 @@ with st.expander(label = "Manage Data Objects"):
             st.session_state.DataManagerOptions = "No Selection"
           st.button(label = "Rename", on_click = rename_data, args = (data_manager_data_selector.name,))
       case "Period/Date to Charity":
-        def temp():
+        def temp(): #! Rename
           d.period_or_date_to_charities(st.session_state.DataManagerDataSelector.applications)
           st.session_state.DataManagerDataSelector.add_action_history("period_date_to_charity", "applications", "period_or_date")
           st.toast(f"Applied Period/Date -> Charity Algorithm to '{st.session_state.DataManagerDataSelector.name}'")
           st.session_state.DataManagerDataSelector = "No Selection"
           st.session_state.DataManagerOptions = "No Selection"
-        st.button("Assign Charities", on_click=temp)
+        st.button("Assign Charities", on_click = temp)
       case "Climate Change Keywords":
-        if st.button("Detect Keywords"):
+        def temp(): #! Rename
           d.green_keywords(st.session_state.DataManagerDataSelector.applications)
           st.session_state.DataManagerDataSelector.add_action_history("climate_change_keywords", "applications", "description")
           st.toast(f"Detected Climate Change Keywords in '{st.session_state.DataManagerDataSelector.name}'")
           st.session_state.DataManagerDataSelector = "No Selection"
           st.session_state.DataManagerOptions = "No Selection"
+        st.button("Detect Keywords", on_click = temp)
   else:
     data_manager_options = "No Selection"
 
