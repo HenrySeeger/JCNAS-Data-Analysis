@@ -516,7 +516,7 @@ def period_or_date_to_charities(df):
                                                 #! Figure out why ==None, np.nan, float("nan"), np.isna() weren't working
   df["charities"] = pd.Series([charities + (["gardens_trust"] if type(park_or_garden) == str or "Park/Garden" in ";;".join(grade) else []) for charities, park_or_garden, grade in zip(df["charities"], df["park_or_garden"], df["grade"])])
 
-def green_keywords(df):
+def green_keywords(df): #243 key words/phrases
   green_terms_table = {"climate change adaptation" : r"climate[-\s]resilience|climate[-\s]adaptation|adaptation[-\s]measures|resilience[-\s]measures|future[-\s]proofing|flood[-\s]resilience|flood[-\s]resistance|overheating[-\s]mitigation|thermal[-\s]comfort|sustainable[-\s]drainage|rainwater[-\s]management|surface[-\s]water[-\s]management|water[-\s]efficiency|drought[-\s]resilience|green[-\s]infrastructure|biodiversity[-\s]enhancement|nature[-\s]based[-\s]solutions",
                        "energy efficiency" : r"energy[-\s]efficiency[-\s]improvements|thermal[-\s]upgrade|fabric[-\s]first[-\s]approach|building[-\s]fabric[-\s]improvements|insulation|secondary[-\s]glazing|draught[-\s]proofing|airtightness|heat[-\s]loss[-\s]reduction|thermal[-\s]performance|u[-\s]value|building[-\s]performance|energy[-\s]demand[-\s]reduction|retrofit|sensitive[-\s]retrofit|deep[-\s]retrofit|whole[-\s]building[-\s]retrofit",
                        "decarbonisation" : r"decarboni[sz]ation|net[-\s]zero|low[-\s]carbon|zero[-\s]carbon|carbon[-\s]reduction|carbon[-\s]emissions|operational[-\s]carbon|embodied[-\s]carbon|whole[-\s]life[-\s]carbon|carbon[-\s]footprint|carbon[-\s]savings|carbon[-\s]neutral|carbon[-\s]assessment",
