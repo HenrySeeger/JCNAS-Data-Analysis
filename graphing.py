@@ -1,10 +1,12 @@
 import re
 import math
+import textwrap
 import numpy as np
 import pandas as pd
 import DataObject as d
 import streamlit as st
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 st.session_state.setdefault("data_objects", [])
 
@@ -49,14 +51,14 @@ for i, col in enumerate(st.columns([3, 11], gap = None)):
 def select_object_format(num):
   return num if type(num) == str else st.session_state.data_objects[num].name
 
-st.markdown(f"<h3 style='color: #{"646464" if st.session_state.GraphTypeSelect == "Select a Graph Type" else "ffffff"};'>Graph Parameters</h3>", unsafe_allow_html = True)
+st.markdown(f"<h3 style='{"color: #646464" if st.session_state.GraphTypeSelect == "Select a Graph Type" else ""};'>Graph Parameters</h3>", unsafe_allow_html = True)
 
 #* Data Object Selector
 col1, col2 = st.columns([2, 10], gap = None)
 with col1:
   st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px; color: #{"646464" if st.session_state.GraphTypeSelect == "Select a Graph Type" else "ffffff"}'>Data Objects:</div>", unsafe_allow_html = True) #Remove|<span style = 'color: red;'><u>Replace</u></span>
 with col2:
-  data_object_indices = st.multiselect(label = "Select an X-Axis Data Object", disabled = st.session_state.GraphTypeSelect == "Select a Graph Type", options = list(range(len(st.session_state.data_objects))), label_visibility = "collapsed", default = None, format_func = select_object_format)
+  data_object_indices = st.multiselect(label = "Select a Data Object", disabled = st.session_state.GraphTypeSelect == "Select a Graph Type", options = list(range(len(st.session_state.data_objects))), label_visibility = "collapsed", default = None, format_func = select_object_format)
 
 if st.session_state.GraphTypeSelect != "Select a Graph Type":
   #* Independent Variable
@@ -85,13 +87,18 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
       active = x_col_name != "No Variable Selected"
       groups = st.multiselect(label = "Select column groups", disabled = x_col_name == "No Variable Selected", options = sorted(set(val for val_list in x_col for val in val_list)) if active and x_col.dtype == np.dtypes.ObjectDType else [], accept_new_options = active and x_col.dtype != np.dtypes.ObjectDType, label_visibility = "collapsed")
 
+  #* Figure Layout
   with st.expander(label = "Figure Layout"):
     #* Figure Title
-    col1, col2 = st.columns([1, 11], gap = None)
+    col1, col2, col3, col4 = st.columns([1, 7, 2, 2], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Title:</div>", unsafe_allow_html = True)
     with col2:
       figure_title = st.text_input(label = "figure title", value = "", label_visibility = "collapsed")
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Title Width:</div>", unsafe_allow_html = True)
+    with col4:
+      figure_title_width = st.number_input(label = "figure title width", value = None, step = 1, label_visibility = "collapsed")
 
     #* Figure Dimensions
     col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
@@ -147,6 +154,62 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
       # with col4:
       #   x_axis_right_lim = st.number_input(label = "x_axis right lim", label_visibility = "collapsed", value = None)
 
+  #* Legend
+  with st.expander(label = "Legend"):
+    #* Legend Toggle
+    col1, col2, col3, col4 = st.columns([2.5, 2.5, 3.25, 3.75], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 8.5px; text-align: right; padding-right: 15px;'>Enable Legend:</div>", unsafe_allow_html = True)
+    with col2:
+      show_legend = st.toggle(label = "show legend", value = True, label_visibility = "collapsed")
+      legend_parameters_label_color = "" if show_legend else "color: #959595"
+    with col3:
+      st.markdown(f"<div style='padding-top: 8.5px; text-align: right; padding-right: 15px; {legend_parameters_label_color};'>Number of Columns:</div>", unsafe_allow_html = True)
+    with col4:
+      legend_ncols = st.number_input(label = "legend ncols", value = 1, min_value = 1, step = 1, disabled = not show_legend, label_visibility = "collapsed")      
+
+    #* Row/Col Dimensions
+    col1, col2, col3, col4 = st.columns([2.25, 3.75, 2.25, 3.75], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 8.5px; text-align: right; padding-right: 15px; {legend_parameters_label_color};'>X-Coordinate:</div>", unsafe_allow_html = True)
+    with col2:
+      legend_xpos = st.number_input(label = "legend xpos", value = None, step = 0.01, disabled = not show_legend, label_visibility = "collapsed")
+    with col3:
+      st.markdown(f"<div style='padding-top: 8.5px; text-align: right; padding-right: 15px; {legend_parameters_label_color};'>Y-Coordinate:</div>", unsafe_allow_html = True)
+    with col4:
+      legend_ypos = st.number_input(label = "legend ypos", value = None, step = 0.01, disabled = not show_legend, label_visibility = "collapsed")
+
+    #* New Labels Toggle
+    col1, col2 = st.columns([3, 9], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 8.5px; text-align: right; padding-right: 15px; {legend_parameters_label_color};'>Manual Legend Entry:</div>", unsafe_allow_html = True)
+    with col2:
+      manual_legend_entry_toggle = st.toggle(label = "manual legend entry", value = False, disabled = not show_legend, label_visibility = "collapsed")
+
+    #* Optional Different Legend Labels
+    manual_legend_parameters_label_color = "" if show_legend and manual_legend_entry_toggle else "color: #959595"
+    col1, col2 = st.columns([2.5, 9.5], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 7.5px; text-align: right; padding-right: 15px; {manual_legend_parameters_label_color};'>Manual Labels:</div>", unsafe_allow_html = True)
+    with col2:
+      legend_new_labels = st.multiselect(label = "legend new labels", disabled = not (show_legend and manual_legend_entry_toggle), options = None, accept_new_options = True, label_visibility = "collapsed")
+
+    #* Optional Different Legend Colors
+    col1, col2, col3, col4 = st.columns([3.5, 3, 1.75, 3.75], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px; {manual_legend_parameters_label_color};'>Manual Color Entry Type:</div>", unsafe_allow_html = True)
+    with col2:
+      legend_new_colors_entry_type = st.selectbox(label = "legend_new_colors_entry_type", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", options = ["Single Entry", "Multiple Entry", "Color Map Entry"])
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px; {manual_legend_parameters_label_color}'>Fill Colors:</div>", unsafe_allow_html = True)
+    with col4:
+      if legend_new_colors_entry_type == "Single Entry":
+        legend_new_colors = st.color_picker(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", value = None)
+      if legend_new_colors_entry_type == "Multiple Entry":
+        legend_new_colors = st.multiselect(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", options = [], accept_new_options = True)
+      if legend_new_colors_entry_type == "Color Map Entry":
+        legend_new_colors = st.text_input(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", value = "")
+
 #* Bar Plot Specific  
 if st.session_state.GraphTypeSelect in ["Bar Plot"]:
   with st.expander(label = "Bar Plot-Specific"):
@@ -190,16 +253,23 @@ if st.session_state.GraphTypeSelect in ["Pie Chart"]:
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Color Entry Type:</div>", unsafe_allow_html = True)
     with col2:
-      wedge_fill_colors_entry_type = st.selectbox(label = "bin__fill_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Multiple Entry", "Color Map Entry"])
+      wedge_fill_colors_entry_type = st.selectbox(label = "wedge_fill_colors_entry_type", label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
     with col3:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Colors:</div>", unsafe_allow_html = True)
     with col4:
       if wedge_fill_colors_entry_type == "Single Entry":
-        wedge_fill_colors = st.color_picker(label = "Fill Colors", label_visibility = "collapsed", value = None)
+        wedge_fill_colors = st.color_picker(label = "Wedge Fill Colors", label_visibility = "collapsed", value = None)
       if wedge_fill_colors_entry_type == "Multiple Entry":
-        wedge_fill_colors = st.multiselect(label = "Fill Colorss", label_visibility = "collapsed", options = [], accept_new_options = True)
+        wedge_fill_colors = st.multiselect(label = "Wedge Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
       if wedge_fill_colors_entry_type == "Color Map Entry":
-        wedge_fill_colors = st.text_input(label = "Fill Colors", label_visibility = "collapsed", value = "")
+        wedge_fill_colors = st.text_input(label = "Wedge Fill Colors", label_visibility = "collapsed", value = "")
+
+    #* Wedge Width (Central Gap)
+    col1, col2= st.columns([2.5, 9.5], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Wedge Width</div>", unsafe_allow_html = True)
+    with col2:
+      wedge_width = st.number_input(label = "wedge_width", value = 1., min_value = 0.0, step = 0.01, max_value = 1.0, label_visibility = "collapsed")
 
 
 # Made for formatting a plotly graph
@@ -247,12 +317,28 @@ def plt_formatting(fig):
 
   return fig
 
-match st.session_state.GraphTypeSelect:
-  case "Bar Plot":
-    st.text("Bar Plot")
-  case "Pie Chart":
-    if x_col_name != "No Variable Selected" and len(groups) > 0:
-      fig, ax = plt.subplots(1, 1, figsize = (figure_width, figure_height))
-      ax.pie([len([col for col in x_col if group in col]) for group in groups], labels = groups, colors = interpret_colors(wedge_fill_colors, len(groups), wedge_fill_colors_entry_type))
-      fig.legend()
-      st.pyplot(fig, width = "content")
+#* Graphing
+if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "No Variable Selected" and len(groups) > 0:
+  st.button(label = "Click to Reload Graph")
+  
+  fig, ax = plt.subplots(1, 1, figsize = (figure_width, figure_height))
+
+  ax.set_title(label = textwrap.fill(figure_title, width = max(len(figure_title), 1) if figure_title_width == None else figure_title_width))
+  
+  match st.session_state.GraphTypeSelect:
+    case "Bar Plot":
+      st.text("Bar Plot")
+
+    case "Pie Chart":
+      ax.pie([len([col for col in x_col if group in col]) for group in groups], labels = groups, wedgeprops = {"width" : wedge_width}, colors = interpret_colors(wedge_fill_colors, len(groups), wedge_fill_colors_entry_type))
+
+  if show_legend:
+    legend_kwargs = {}
+    if legend_xpos != None and legend_ypos != None:
+      legend_kwargs["bbox_to_anchor"] = (legend_xpos, legend_ypos)
+      legend_kwargs["loc"] = "upper left"
+    if manual_legend_entry_toggle:
+      legend_kwargs["handles"] = [Line2D([], [], marker = "o", linestyle = "", color = color, label = text) for text, color in zip(legend_new_labels, interpret_colors(legend_new_colors, len(legend_new_labels), legend_new_colors_entry_type))]
+    fig.legend(ncols = legend_ncols, **legend_kwargs)
+  
+  st.pyplot(fig, width = "content")
