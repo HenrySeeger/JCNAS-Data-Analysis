@@ -485,36 +485,40 @@ def period_or_date_to_charities(df):
                                  "bounds"  : [[-sys.maxsize - 1, 1720], [1715, 1840], [1837, 1914], [1913, sys.maxsize]]})
 
   time_period_reference_table = {"neolithic" : ["spab"],
-                                 "iron-age" : ["cba", "hbap"],
-                                 "bronze-age" : ["spab"],
-                                 "prehistoric" : ["spab"],
-                                 "roman" : ["spab"],
-                                 "pre-medieval" : ["hbap", "spab"],
-                                 "pre-mediaeval" : ["hbap", "spab"],
-                                 "medieval" : ["cba", "hbap", "spab"],
-                                 "mediaeval" : ["cba", "hbap", "spab"],
-                                 "norman" : ["spab"],
-                                 "middle-ages" : ["spab"],
-                                 "anglo-saxon" : ["cba", "hbap"],
-                                 "anglosaxon" : ["cba", "hbap"],
-                                 "georgian" : ["georgian"],
+                                  "iron-age" : ["cba"],
+                                "bronze-age" : ["spab"],
+                               "prehistoric" : ["spab"],
+                                     "roman" : ["spab"],
+                              "pre-medieval" : ["spab"],
+                             "pre-mediaeval" : ["spab"],
+                                  "medieval" : ["cba", "spab"],
+                                 "mediaeval" : ["cba", "spab"],
+                                    "norman" : ["spab"],
+                               "middle-ages" : ["spab"],
+                               "anglo-saxon" : ["cba"],
+                                "anglosaxon" : ["cba"],
+                                  "georgian" : ["georgian"],
                                  "victorian" : ["victorian"],
-                                 "edwardian" : ["hbap", "victorian"],
-                                 "postwar" : ["c20"],
-                                 "post-war" : ["c20"],
-                                 "modern" : ["c20"]}
+                                 "edwardian" : ["victorian"],
+                                   "postwar" : ["c20"],
+                                  "post-war" : ["c20"],
+                                    "modern" : ["c20"]}
 
   for charity, bounds in zip(charity_bounds["charity"], charity_bounds["bounds"]):
-    merged_df[charity] = [[charity] if [range for range in ranges if range[0] < bounds[1] and range[1] > bounds[0]] or
-                                       [year for year in years if bounds[0] < year and year < bounds[1]] or
+    merged_df[charity] = [[charity] if [range for range in ranges if range[0] <= bounds[1] and range[1] >= bounds[0]] or
+                                       [year for year in years if bounds[0] <= year and year <= bounds[1]] or
                                        [other for other in others if charity in time_period_reference_table[other.lower()]] else []
                           for ranges, years, others in zip(merged_df["range"], merged_df["year"], merged_df["other"])]
 
-  df["charities"] = [s + g + v + c for g, s, v, c in zip(merged_df["spab"], merged_df["georgian"], merged_df["victorian"], merged_df["c20"])]
+
+  df["charities"] = [["hbap"] + s + g + v + c for g, s, v, c in zip(merged_df["spab"], merged_df["georgian"], merged_df["victorian"], merged_df["c20"])]
 
   #* Adds the Gardens Trust
                                                 #! Figure out why ==None, np.nan, float("nan"), np.isna() weren't working
   df["charities"] = pd.Series([charities + (["gardens_trust"] if type(park_or_garden) == str or "Park/Garden" in ";;".join(grade) else []) for charities, park_or_garden, grade in zip(df["charities"], df["park_or_garden"], df["grade"])])
+
+  #* Adds the Council for British Archaeology
+  df["charities"] = pd.Series([charities + (["cba"] if (app_type in ["Church", "Cathedral"] or re.search(r"ecclesiastical", description, flags = re.IGNORECASE) or "cba" in time_period_reference_table[other.lower()]) else []) for charities, app_type, description, other in zip(df["charities"], df["application_type"], df["description"], merged_df["other"])])
 
 def green_keywords(df): #243 key words/phrases
   green_terms_table = {"climate change adaptation" : r"climate[-\s]resilience|climate[-\s]adaptation|adaptation[-\s]measures|resilience[-\s]measures|future[-\s]proofing|flood[-\s]resilience|flood[-\s]resistance|overheating[-\s]mitigation|thermal[-\s]comfort|sustainable[-\s]drainage|rainwater[-\s]management|surface[-\s]water[-\s]management|water[-\s]efficiency|drought[-\s]resilience|green[-\s]infrastructure|biodiversity[-\s]enhancement|nature[-\s]based[-\s]solutions",
