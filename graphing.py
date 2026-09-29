@@ -564,5 +564,3 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
     fig.legend(ncols = legend_ncols, **legend_kwargs)
   
   st.pyplot(fig, width = "content")
-
-st.text("testing")
