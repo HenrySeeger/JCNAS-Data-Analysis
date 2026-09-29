@@ -7,6 +7,7 @@ import DataObject as d
 import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import matplotlib.ticker as mticker
 
 st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("x_groups_dict", {})
@@ -38,8 +39,19 @@ def interpret_colors(colors, desired_num_colors, entry_type):
 
     return colors[:desired_num_colors]
 
+def interpret_ticks(tick_input, entry_type): #! Update to allow for float inputs
+  tick_input = [int(tick) for tick in tick_input.replace(" ", "").split(",") if tick != ""]
+  match entry_type:
+    case "Manual":
+      return tick_input
+    case "Range":
+      return range(*tick_input)
+    case "Log Range":
+      return [10**tick for tick in range(*tick_input)]
+
 st.header("Graphing")
 
+#* Select a Graph Type Header
 for i, col in enumerate(st.columns([3, 11], gap = None)):
   with col:
     if i == 0:
@@ -57,7 +69,7 @@ st.markdown(f"<h3 style='{"color: #646464" if st.session_state.GraphTypeSelect =
 #* Data Object Selector
 col1, col2 = st.columns([2, 10], gap = None)
 with col1:
-  st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px; color: #{"646464" if st.session_state.GraphTypeSelect == "Select a Graph Type" else "ffffff"}'>Data Objects:</div>", unsafe_allow_html = True) #Remove|<span style = 'color: red;'><u>Replace</u></span>
+  st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px; color: #{"646464" if st.session_state.GraphTypeSelect == "Select a Graph Type" else "ffffff"}'>Data Objects:</div>", unsafe_allow_html = True)
 with col2:
   data_object_indices = st.multiselect(label = "Select a Data Object", disabled = st.session_state.GraphTypeSelect == "Select a Graph Type", options = list(range(len(st.session_state.data_objects))), label_visibility = "collapsed", default = None, format_func = select_object_format)
 
@@ -145,7 +157,7 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
     with col3:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Title Width:</div>", unsafe_allow_html = True)
     with col4:
-      figure_title_width = st.number_input(label = "figure title width", value = None, step = 1, label_visibility = "collapsed")
+      figure_title_width = st.number_input(label = "figure title width", value = None, min_value = 1, step = 1, placeholder = "∞", label_visibility = "collapsed")
 
     #* Figure Dimensions
     col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
@@ -173,33 +185,88 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
       with col1:
         st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Tick Entry Type:</div>", unsafe_allow_html = True)
       with col2:
-        x_col_name = st.selectbox(label = "x-axis tick marks type", disabled = len(data_object_indices) == 0, options = ["Manual", "Range", "Log Range"], label_visibility = "collapsed")
+        x_axis_tick_marks_type = st.selectbox(label = "x_axis_tick_marks type", disabled = len(data_object_indices) == 0, options = ["Manual", "Range", "Log Range"], label_visibility = "collapsed")
       with col3:
-        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px;'>Tick Marks:</div>", unsafe_allow_html = True) #Remove|<span style = 'color: red;'><u>Replace</u></span>
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px;'>Tick Marks:</div>", unsafe_allow_html = True)
       with col4:
-        x_axis_tick_marks = st.text_input(label = "x-axis tick marks", label_visibility = "collapsed", placeholder = "0, 2, 4, ...")
+        x_axis_tick_marks_placeholders = {"Manual" : "0, 1, 2, ...", "Range" : "Start, Stop, Step", "Log Range" : "log(Start), log(Stop), log(Step)"}
+        x_axis_tick_marks = st.text_input(label = "x_axis_tick_marks", label_visibility = "collapsed", placeholder = x_axis_tick_marks_placeholders[x_axis_tick_marks_type])
+
+      #* Tick Labels
+      col1, col2 = st.columns([2, 10], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Tick labels:</div>", unsafe_allow_html = True)
+      with col2:
+        x_axis_tick_labels = st.multiselect(label = "x_axis_tick_labels", options = [], label_visibility = "collapsed", accept_new_options = True)
 
       #* Left/Right Limits
       col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
       with col1:
         st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Left Limit:</div>", unsafe_allow_html = True)
       with col2:
-        x_axis_left_lim = st.number_input(label = "x_axis left lim", label_visibility = "collapsed", value = None)
+        x_axis_left_lim = st.number_input(label = "x_axis left lim", step = 0.1, label_visibility = "collapsed", value = None)
       with col3:
         st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Right Limit:</div>", unsafe_allow_html = True)
       with col4:
-        x_axis_right_lim = st.number_input(label = "x_axis right lim", label_visibility = "collapsed", value = None)
+        x_axis_right_lim = st.number_input(label = "x_axis right lim", step = 0.1, label_visibility = "collapsed", value = None)
 
       #* Scale
       col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
       with col1:
         st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Scale:</div>", unsafe_allow_html = True)
       with col2:
-        x_axis_scale = st.selectbox(label = "x_axis scale", label_visibility = "collapsed", options = ["linear", "log", "symlog"])
-      # with col3:
-      #   st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Right Limit:</div>", unsafe_allow_html = True)
-      # with col4:
-      #   x_axis_right_lim = st.number_input(label = "x_axis right lim", label_visibility = "collapsed", value = None)
+        x_axis_scale = st.selectbox(label = "x_axis scale", label_visibility = "collapsed", options = ["Linear", "Log", "Symlog"])
+
+  #* Y-Axis
+  if st.session_state.GraphTypeSelect not in ["Pie Chart"]:
+    with st.expander(label = "Y-Axis"):
+      #* Variable and Label Selection
+      col1, col2 = st.columns([2, 10], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Label:</div>", unsafe_allow_html = True)
+      with col2:
+        y_axis_label = st.text_input(label = "y_axis_label", label_visibility = "collapsed", placeholder = "Axis Label")
+
+      #* Tick Marks
+      col1, col2, col3, col4 = st.columns([2.25, 3.75, 2, 4], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Tick Entry Type:</div>", unsafe_allow_html = True)
+      with col2:
+        y_axis_tick_marks_type = st.selectbox(label = "y_axis_tick_marks type", disabled = len(data_object_indices) == 0, options = ["Manual", "Range", "Log Range"], label_visibility = "collapsed")
+      with col3:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px;'>Tick Marks:</div>", unsafe_allow_html = True)
+      with col4:
+        y_axis_tick_marks_placeholders = {"Manual" : "0, 1, 2, ...", "Range" : "Start, Stop, Step", "Log Range" : "log(Start), log(Stop), log(Step)"}
+        y_axis_tick_marks = st.text_input(label = "y_axis_tick_marks", label_visibility = "collapsed", placeholder = y_axis_tick_marks_placeholders[y_axis_tick_marks_type])
+
+      #* Tick Labels
+      col1, col2 = st.columns([2, 10], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Tick labels:</div>", unsafe_allow_html = True)
+      with col2:
+        y_axis_tick_labels = st.multiselect(label = "y_axis_tick_labels", options = [], label_visibility = "collapsed", accept_new_options = True)
+
+      #* Left/Right Limits
+      col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Lower Limit:</div>", unsafe_allow_html = True)
+      with col2:
+        y_axis_bottom_lim = st.number_input(label = "y_axis_bottom_lim", step = 0.1, label_visibility = "collapsed", value = None)
+      with col3:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Upper Limit:</div>", unsafe_allow_html = True)
+      with col4:
+        y_axis_top_lim = st.number_input(label = "y_axis_top_lim", step = 0.1, label_visibility = "collapsed", value = None)
+
+      #* Scale
+      col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Scale:</div>", unsafe_allow_html = True)
+      with col2:
+        y_axis_scale = st.selectbox(label = "y_axis_scale", label_visibility = "collapsed", options = ["Linear", "Log", "Symlog"])
+      with col3:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Y-Axis Lines:</div>", unsafe_allow_html = True)
+      with col4:
+        y_axis_grid_lines = st.toggle(label = "y_axis_grid_lines", value = False, label_visibility = "collapsed")
 
   #* Legend
   with st.expander(label = "Legend"):
@@ -260,37 +327,48 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
 #* Bar Plot Specific  
 if st.session_state.GraphTypeSelect in ["Bar Plot"]:
   with st.expander(label = "Bar Plot-Specific"):
-    #* Bin Fill Color
+    #* Bar Fill Color
     col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Entry Type:</div>", unsafe_allow_html = True)
     with col2:
-      bin_fill_colors_entry_type = st.selectbox(label = "bin__fill_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Multiple Entry", "Color Map Entry"])
+      bar_fill_colors_entry_type = st.selectbox(label = "bar__fill_colors_entry_type", label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
     with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Color:</div>", unsafe_allow_html = True)
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Colors:</div>", unsafe_allow_html = True)
     with col4:
-      if bin_fill_colors_entry_type == "Single Entry":
-        bin_fill_colors = st.color_picker(label = "Fill Colors", label_visibility = "collapsed", value = None)
-      if bin_fill_colors_entry_type == "Multiple Entry":
-        bin_fill_colors = st.multiselect(label = "Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
-      if bin_fill_colors_entry_type == "Color Map Entry":
-        bin_fill_colors = st.text_input(label = "Fill Colors", label_visibility = "collapsed", value = None)
+      if bar_fill_colors_entry_type == "Multiple Entry":
+        bar_fill_colors = st.multiselect(label = "Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
+      if bar_fill_colors_entry_type == "Single Entry":
+        bar_fill_colors = st.color_picker(label = "Fill Colors", label_visibility = "collapsed", value = None)
+      if bar_fill_colors_entry_type == "Color Map Entry":
+        bar_fill_colors = st.text_input(label = "Fill Colors", label_visibility = "collapsed", value = "")
 
-    #* Bin Edge Color
+    #* Bar Edge Color
     col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Entry Type:</div>", unsafe_allow_html = True)
     with col2:
-      bin_edge_colors_entry_type = st.selectbox(label = "bin_edge_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Multiple Entry", "Color Map Entry"])
+      bar_edge_colors_entry_type = st.selectbox(label = "bar_edge_colors_entry_type", label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
     with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Edge Color:</div>", unsafe_allow_html = True)
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Edge Colors:</div>", unsafe_allow_html = True)
     with col4:
-      if bin_edge_colors_entry_type == "Single Entry":
-        bin_edge_colors = st.color_picker(label = "Edge Colors", label_visibility = "collapsed", value = None)
-      if bin_edge_colors_entry_type == "Multiple Entry":
-        bin_edge_colors = st.multiselect(label = "Edge Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
-      if bin_edge_colors_entry_type == "Color Map Entry":
-        bin_edge_colors = st.text_input(label = "Edge Colors", label_visibility = "collapsed", value = None)
+      if bar_edge_colors_entry_type == "Multiple Entry":
+        bar_edge_colors = st.multiselect(label = "Edge Colors", label_visibility = "collapsed", options = [], placeholder = "None", accept_new_options = True)
+      if bar_edge_colors_entry_type == "Single Entry":
+        bar_edge_colors = st.color_picker(label = "Edge Colors", label_visibility = "collapsed", value = None)
+      if bar_edge_colors_entry_type == "Color Map Entry":
+        bar_edge_colors = st.text_input(label = "Edge Colors", label_visibility = "collapsed", value = "", placeholder = "None")
+
+   #* Tick Marks
+    col1, col2, col3, col4 = st.columns([2, 2.25, 1.75, 6], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Bar Width:</div>", unsafe_allow_html = True)
+    with col2:
+      bar_width = st.number_input(label = "bar_width", min_value = 0., max_value = 1., step = 0.1, value = 0.8, label_visibility = "collapsed")
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px;'>Bar Ticks:</div>", unsafe_allow_html = True)
+    with col4:
+      bar_tick_marks = st.text_input(label = "bar tick marks", label_visibility = "collapsed", placeholder = "0, 1, 2, ...")
 
 #* Pie Chart Specific
 if st.session_state.GraphTypeSelect in ["Pie Chart"]:
@@ -304,10 +382,10 @@ if st.session_state.GraphTypeSelect in ["Pie Chart"]:
     with col3:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Colors:</div>", unsafe_allow_html = True)
     with col4:
-      if wedge_fill_colors_entry_type == "Single Entry":
-        wedge_fill_colors = st.color_picker(label = "Wedge Fill Colors", label_visibility = "collapsed", value = None)
       if wedge_fill_colors_entry_type == "Multiple Entry":
         wedge_fill_colors = st.multiselect(label = "Wedge Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
+      if wedge_fill_colors_entry_type == "Single Entry":
+        wedge_fill_colors = st.color_picker(label = "Wedge Fill Colors", label_visibility = "collapsed", value = None)
       if wedge_fill_colors_entry_type == "Color Map Entry":
         wedge_fill_colors = st.text_input(label = "Wedge Fill Colors", label_visibility = "collapsed", value = "")
 
@@ -325,15 +403,15 @@ if st.session_state.GraphTypeSelect in ["Pie Chart"]:
     #* Label Choices and Wedge Width
     col1, col2, col3, col4, col5, col6 = st.columns([3.25, 0.75, 3.25, 0.75, 2.0, 2], gap = None)
     with col1:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Label: Include Percent:</div>", unsafe_allow_html = True)
+      st.markdown(f"<div style='padding-top: 9px; text-align: right; padding-right: 15px;'>Label: Include Percent:</div>", unsafe_allow_html = True)
     with col2:
       pie_percent_label = st.toggle(label = "pie_percent_label", value = False, label_visibility = "collapsed")
     with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Label: Include Number:</div>", unsafe_allow_html = True)
+      st.markdown(f"<div style='padding-top: 9px; text-align: right; padding-right: 15px;'>Label: Include Number:</div>", unsafe_allow_html = True)
     with col4:
       pie_number_label = st.toggle(label = "pie_number_label", value = False, label_visibility = "collapsed")
     with col5:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Wedge Width</div>", unsafe_allow_html = True)
+      st.markdown(f"<div style='padding-top: 8px; text-align: right; padding-right: 15px;'>Wedge Width</div>", unsafe_allow_html = True)
     with col6:
       wedge_width = st.number_input(label = "wedge_width", value = 1., min_value = 0.0, step = 0.01, max_value = 1.0, label_visibility = "collapsed")
 
@@ -399,7 +477,32 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
   
   match st.session_state.GraphTypeSelect:
     case "Bar Plot":
-      st.text("Bar Plot")
+      def bar_group_sizes():
+        bar_kwargs = {"height" : [], "x" : [], "label" : st.session_state.x_groups_dict, "facecolor" : interpret_colors(bar_fill_colors, len(st.session_state.x_groups_dict), bar_fill_colors_entry_type), "edgecolor" : interpret_colors(bar_edge_colors, len(st.session_state.x_groups_dict), bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None}
+        match type(st.session_state.data_objects[data_object_indices[0]].key_owner(x_col_name)[0].dtypes[x_col_name]):
+          case np.dtypes.ObjectDType:
+            bar_kwargs["height"] = [len([col for col in x_col if len(group & set(col)) > 0]) for group in st.session_state.x_groups_dict.values()]
+            bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
+          case pd.StringDtype:
+            bar_kwargs["height"] = [len([col for col in x_col if type(col) != float and re.search("|".join(group), col, flags = re.IGNORECASE)]) if len(group) > 0 else 0 for group in st.session_state.x_groups_dict.values()]
+            bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
+          case np.dtypes.DateTime64DType:
+            start_date = min(x_col)
+            end_date = max(x_col)
+            match st.session_state.x_groups:
+              case "Yearly":
+                bar_kwargs["height"] = [sum((pd.Timestamp(f"{year}/01/01") <= x_col) & (x_col <= pd.Timestamp(f"{year}/12/31"))) for year in st.session_state.current_x_group_items]
+                bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
+                bar_kwargs["label"] = st.session_state.current_x_group_items
+                bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, end_date.year - start_date.year + 1, bar_fill_colors_entry_type)
+              case "Monthly":
+                bar_kwargs["height"] = [sum((bounds[0] <= x_col) & (x_col <= bounds[1])) for bounds in st.session_state.current_x_group_items]
+                bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
+                bar_kwargs["label"] = [f"{dates[0].year}-{str(dates[0].month).zfill(2)}" for dates in st.session_state.current_x_group_items]
+                bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, len(st.session_state.current_x_group_items), bar_fill_colors_entry_type)
+        return bar_kwargs
+      
+      ax.bar(**bar_group_sizes(), width = bar_width, log = False)
 
     case "Pie Chart":
       def wedge_group_sizes():
@@ -407,9 +510,10 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
         match type(st.session_state.data_objects[data_object_indices[0]].key_owner(x_col_name)[0].dtypes[x_col_name]):
           case np.dtypes.ObjectDType:
             wedge_kwargs["x"] = [len([col for col in x_col if len(group & set(col)) > 0]) for group in st.session_state.x_groups_dict.values()]
-            wedge_kwargs["labels"] = [f"{name}, {wedge_kwargs["x"][i]:,}, {wedge_kwargs["x"][i] / sum(wedge_kwargs["x"]) * 100:.1f}%" for i, name in enumerate(st.session_state.x_groups_dict.keys())]
+            wedge_kwargs["labels"] = [f"{name}{"\n" if pie_percent_label or pie_number_label else ""}{f"{wedge_kwargs["x"][i] / sum(wedge_kwargs["x"]) * 100:.1f}" + "%" if pie_percent_label else ""}{" " if pie_percent_label and pie_number_label else ""}{"(" + f"{wedge_kwargs["x"][i]:,}" + ")" if pie_number_label else ""}" for i, name in enumerate(st.session_state.x_groups_dict.keys())]
           case pd.StringDtype:
             wedge_kwargs["x"] = [len([col for col in x_col if type(col) != float and re.search("|".join(group), col, flags = re.IGNORECASE)]) if len(group) > 0 else 0 for group in st.session_state.x_groups_dict.values()]
+            wedge_kwargs["labels"] = [f"{name}{"\n" if pie_percent_label or pie_number_label else ""}{f"{wedge_kwargs["x"][i] / sum(wedge_kwargs["x"]) * 100:.1f}" + "%" if pie_percent_label else ""}{" " if pie_percent_label and pie_number_label else ""}{"(" + f"{wedge_kwargs["x"][i]:,}" + ")" if pie_number_label else ""}" for i, name in enumerate(st.session_state.x_groups_dict.keys())]
           case np.dtypes.DateTime64DType:
             start_date = min(x_col)
             end_date = max(x_col)
@@ -425,6 +529,28 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
         return wedge_kwargs
 
       ax.pie(**wedge_group_sizes(), wedgeprops = {"width" : wedge_width}, textprops = {"fontsize" : pie_label_font_size}, startangle = wedge_starting_angle, counterclock = pie_rotation == "Counterclockwise")
+
+  if st.session_state.GraphTypeSelect not in ["Pie Chart"]:
+    ax.set_xlabel(x_axis_label)
+    ax.set_xlim(left = x_axis_left_lim, right = x_axis_right_lim)
+    ax.set_xscale(x_axis_scale.lower())
+    if x_axis_tick_marks not in ["", None]:
+      x_ticks = interpret_ticks(x_axis_tick_marks, x_axis_tick_marks_type)
+      ax.set_xticks(x_ticks, labels = None if len(x_axis_tick_labels) == 0 else x_axis_tick_labels[:len(x_ticks)] + [""] * max(len(x_ticks) - len(x_axis_tick_labels), 0))
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}" if x.is_integer() else f"{x:g}"))
+
+  if st.session_state.GraphTypeSelect not in ["Pie Chart"]:
+    ax.set_ylabel(y_axis_label)
+    ax.set_ylim(bottom = y_axis_bottom_lim, top = y_axis_top_lim)
+    ax.set_yscale(y_axis_scale.lower())
+    if y_axis_tick_marks not in ["", None]:
+      y_ticks = interpret_ticks(y_axis_tick_marks, y_axis_tick_marks_type)
+      ax.set_yticks(y_ticks, labels = None if len(y_axis_tick_labels) == 0 else y_axis_tick_labels[:len(y_ticks)] + [""] * max(len(y_ticks) - len(y_axis_tick_labels), 0))
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{int(y):,}" if y.is_integer() else f"{y:g}"))
+    if y_axis_grid_lines:
+      ax.grid(axis = 'y')
+      ax.set_axisbelow(True)
+
   if show_legend:
     legend_kwargs = {}
 

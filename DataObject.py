@@ -518,7 +518,7 @@ def period_or_date_to_charities(df):
   df["charities"] = pd.Series([charities + (["gardens_trust"] if type(park_or_garden) == str or "Park/Garden" in ";;".join(grade) else []) for charities, park_or_garden, grade in zip(df["charities"], df["park_or_garden"], df["grade"])])
 
   #* Adds the Council for British Archaeology
-  df["charities"] = pd.Series([charities + (["cba"] if (app_type in ["Church", "Cathedral"] or re.search(r"ecclesiastical", description, flags = re.IGNORECASE) or "cba" in time_period_reference_table[other.lower()]) else []) for charities, app_type, description, other in zip(df["charities"], df["application_type"], df["description"], merged_df["other"])])
+  df["charities"] = pd.Series([charities + (["cba"] if type(description) == str and (app_type in ["Church", "Cathedral"] or re.search(r"ecclesiastical", description, flags = re.IGNORECASE) or "cba" in [time_period_reference_table[other.lower()] for other in others]) else []) for charities, app_type, description, others in zip(df["charities"], df["application_type"], df["description"], merged_df["other"])])
 
 def green_keywords(df): #243 key words/phrases
   green_terms_table = {"climate change adaptation" : r"climate[-\s]resilience|climate[-\s]adaptation|adaptation[-\s]measures|resilience[-\s]measures|future[-\s]proofing|flood[-\s]resilience|flood[-\s]resistance|overheating[-\s]mitigation|thermal[-\s]comfort|sustainable[-\s]drainage|rainwater[-\s]management|surface[-\s]water[-\s]management|water[-\s]efficiency|drought[-\s]resilience|green[-\s]infrastructure|biodiversity[-\s]enhancement|nature[-\s]based[-\s]solutions",
