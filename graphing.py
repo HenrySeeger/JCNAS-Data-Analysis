@@ -495,11 +495,13 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
                 bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
                 bar_kwargs["label"] = st.session_state.current_x_group_items
                 bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, end_date.year - start_date.year + 1, bar_fill_colors_entry_type)
+                bar_kwargs["edgecolor"] = interpret_colors(bar_edge_colors, end_date.year - start_date.year + 1, bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None
               case "Monthly":
                 bar_kwargs["height"] = [sum((bounds[0] <= x_col) & (x_col <= bounds[1])) for bounds in st.session_state.current_x_group_items]
                 bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
                 bar_kwargs["label"] = [f"{dates[0].year}-{str(dates[0].month).zfill(2)}" for dates in st.session_state.current_x_group_items]
                 bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, len(st.session_state.current_x_group_items), bar_fill_colors_entry_type)
+                bar_kwargs["edgecolor"] = interpret_colors(bar_edge_colors, len(st.session_state.current_x_group_items), bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None
         return bar_kwargs
       
       ax.bar(**bar_group_sizes(), width = bar_width, log = False)
@@ -530,15 +532,19 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
 
       ax.pie(**wedge_group_sizes(), wedgeprops = {"width" : wedge_width}, textprops = {"fontsize" : pie_label_font_size}, startangle = wedge_starting_angle, counterclock = pie_rotation == "Counterclockwise")
 
+  #* X-Axis Formatting
   if st.session_state.GraphTypeSelect not in ["Pie Chart"]:
     ax.set_xlabel(x_axis_label)
     ax.set_xlim(left = x_axis_left_lim, right = x_axis_right_lim)
     ax.set_xscale(x_axis_scale.lower())
     if x_axis_tick_marks not in ["", None]:
       x_ticks = interpret_ticks(x_axis_tick_marks, x_axis_tick_marks_type)
+      st.text(None if len(x_axis_tick_labels) == 0 else x_axis_tick_labels[:len(x_ticks)] + [""] * max(len(x_ticks) - len(x_axis_tick_labels), 0))
       ax.set_xticks(x_ticks, labels = None if len(x_axis_tick_labels) == 0 else x_axis_tick_labels[:len(x_ticks)] + [""] * max(len(x_ticks) - len(x_axis_tick_labels), 0))
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}" if x.is_integer() else f"{x:g}"))
+    if len(x_axis_tick_labels) == 0:
+      ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}" if x.is_integer() else f"{x:g}"))
 
+  #* Y-Axis Formatting
   if st.session_state.GraphTypeSelect not in ["Pie Chart"]:
     ax.set_ylabel(y_axis_label)
     ax.set_ylim(bottom = y_axis_bottom_lim, top = y_axis_top_lim)
@@ -546,7 +552,8 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
     if y_axis_tick_marks not in ["", None]:
       y_ticks = interpret_ticks(y_axis_tick_marks, y_axis_tick_marks_type)
       ax.set_yticks(y_ticks, labels = None if len(y_axis_tick_labels) == 0 else y_axis_tick_labels[:len(y_ticks)] + [""] * max(len(y_ticks) - len(y_axis_tick_labels), 0))
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{int(y):,}" if y.is_integer() else f"{y:g}"))
+    if len(x_axis_tick_labels) == 0:
+      ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{int(y):,}" if y.is_integer() else f"{y:g}"))
     if y_axis_grid_lines:
       ax.grid(axis = 'y')
       ax.set_axisbelow(True)
