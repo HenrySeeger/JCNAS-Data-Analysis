@@ -128,7 +128,7 @@ with st.expander(label = "Cleaning"):
               if int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound:
                 st.markdown(":red[The lower bound must not be greater than the upper bound.]")
 
-#                                                trying to filter without selected values (None-values included)                                            trying to filter with a lower_bound greater than the upper bound
+                                              # trying to filter without selected values (None-values included)                                            trying to filter with a lower_bound greater than the upper bound
               disable_filter_button = (int_lower_bound is None and int_upper_bound is None and not st.session_state.FilterNoneToggle) or (int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound)
               filter_function = d.int_bounds_filter
               filter_function_args = ((cleaning_data_object_index, cleaning_col, int_lower_bound, int_upper_bound),
@@ -143,7 +143,7 @@ with st.expander(label = "Cleaning"):
               int_selections = st.multiselect(label = "List Integers:", options = None, accept_new_options = True, key = "FilterIntSelections")
 
               try:
-#                                       trying to filter without selected values (None-values included)                
+                                     # trying to filter without selected values (None-values included)                
                 disable_filter_button = int_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function = d.int_values_filter
                 filter_function_args = ((cleaning_data_object_index, cleaning_col, int_selections),
@@ -192,8 +192,8 @@ with st.expander(label = "Cleaning"):
               date_selections = st.multiselect(label = "List Dates:", options = None, accept_new_options = True, placeholder = "YYYY/MM/DD", key = "FilterDateSelections")
 
               try:
-                for date in zip(date_selections):
-                  if not (re.match(r"\d{2}(?:\d{2})/\d{1,2}/\d{1,2}", date)):
+                for date in date_selections:
+                  if not (re.match(r"\d{2}(?:\d{2})?[/-]\d{1,2}[/-]\d{1,2}", date)):
                     raise()
                 disable_filter_button = date_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function = d.date_values_filter
@@ -399,7 +399,7 @@ with st.expander(label = "Replacing"):
 
           try:
             for target, new in zip(date_selections_target, date_selections_new):
-              if not (re.match(r"\d{2}(?:\d{2})/\d{1,2}/\d{1,2}", target) or re.match(r"\d{2}(?:\d{2})/\d{1,2}/\d{1,2}", new)):
+              if not (re.match(r"\d{2}(?:\d{2})?[/-]\d{1,2}[/-]\d{1,2}", target) or re.match(r"\d{2}(?:\d{2})?[/-]\d{1,2}[/-]\d{1,2}", new)):
                 raise()
 #                                                trying to replace entries without target dates          trying to replace entries without new values              trying to replace entries without an equal number of target and new selections              
             disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (date_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(date_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(date_selections_target) != len(date_selections_new))

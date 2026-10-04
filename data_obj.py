@@ -110,7 +110,7 @@ with st.expander(label = "Create a Data Object"):
       st.session_state.data_objects.append(d.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
       st.toast(body = f"DataObject '{creation_name_input}' successfully created")
     else:
-      st.toast(body = f"'{creation_name_input}' could not be created because it is the name of an existing DataObject")
+      st.toast(body = f"'{creation_name_input}' could not be created because a DataObject with that name already exists")
 
   obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or creation_name_input == "", on_click = creation_button_on_click)
 
