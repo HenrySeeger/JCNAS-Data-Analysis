@@ -10,7 +10,7 @@ st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("filter_state", None)
 st.session_state.setdefault("ReplaceNoneToggle", False)
 
-st.header("Cleaning, Filtering, & Merging")
+st.header("Filtering, Replacing, & Merging")
 
 #* Cleaning Section
 with st.expander(label = "Cleaning"):
@@ -264,7 +264,7 @@ with st.expander(label = "Replacing"):
         elif i == 2:
           st.toggle(label = "Inlcude", key = "ReplaceInclusionToggle", value = True, label_visibility = "collapsed")
         else:
-          st.markdown(f"<div style='padding-top: 9.5px;'>{"Include" if st.session_state.ReplaceInclusionToggle else "Exclude"} Selected Bounds/Values</div>", unsafe_allow_html = True)
+          st.markdown(f"<div style='padding-top: 9.5px;'>Replace {"" if st.session_state.ReplaceInclusionToggle else "Non-"}Selected Bounds/Values</div>", unsafe_allow_html = True)
 
     disable_replace_button = True
     replace_function = None

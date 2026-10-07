@@ -326,7 +326,7 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
 
 #* Bar Plot Specific  
 if st.session_state.GraphTypeSelect in ["Bar Plot"]:
-  with st.expander(label = "Bar Plot-Specific"):
+  with st.expander(label = "Bar Plot Specific"):
     #* Bar Fill Color
     col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
     with col1:
@@ -359,12 +359,12 @@ if st.session_state.GraphTypeSelect in ["Bar Plot"]:
       if bar_edge_colors_entry_type == "Color Map Entry":
         bar_edge_colors = st.text_input(label = "Edge Colors", label_visibility = "collapsed", value = "", placeholder = "None")
 
-   #* Tick Marks
+   #* Bar Width and Tick Marks
     col1, col2, col3, col4 = st.columns([2, 2.25, 1.75, 6], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Bar Width:</div>", unsafe_allow_html = True)
     with col2:
-      bar_width = st.number_input(label = "bar_width", min_value = 0., max_value = 1., step = 0.1, value = 0.8, label_visibility = "collapsed")
+      bar_width = st.number_input(label = "bar_width", min_value = 0., step = 0.1, value = 0.8, label_visibility = "collapsed")
     with col3:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15.0px;'>Bar Ticks:</div>", unsafe_allow_html = True)
     with col4:
@@ -372,7 +372,7 @@ if st.session_state.GraphTypeSelect in ["Bar Plot"]:
 
 #* Pie Chart Specific
 if st.session_state.GraphTypeSelect in ["Pie Chart"]:
-  with st.expander(label = "Pie Chart-Specific"):
+  with st.expander(label = "Pie Chart Specific"):
     #* Wedge Fill Color
     col1, col2, col3, col4 = st.columns([2.5, 3.5, 2, 4], gap = None)
     with col1:
@@ -539,7 +539,6 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
     ax.set_xscale(x_axis_scale.lower())
     if x_axis_tick_marks not in ["", None]:
       x_ticks = interpret_ticks(x_axis_tick_marks, x_axis_tick_marks_type)
-      st.text(None if len(x_axis_tick_labels) == 0 else x_axis_tick_labels[:len(x_ticks)] + [""] * max(len(x_ticks) - len(x_axis_tick_labels), 0))
       ax.set_xticks(x_ticks, labels = None if len(x_axis_tick_labels) == 0 else x_axis_tick_labels[:len(x_ticks)] + [""] * max(len(x_ticks) - len(x_axis_tick_labels), 0))
     if len(x_axis_tick_labels) == 0:
       ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}" if x.is_integer() else f"{x:g}"))
@@ -552,7 +551,7 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
     if y_axis_tick_marks not in ["", None]:
       y_ticks = interpret_ticks(y_axis_tick_marks, y_axis_tick_marks_type)
       ax.set_yticks(y_ticks, labels = None if len(y_axis_tick_labels) == 0 else y_axis_tick_labels[:len(y_ticks)] + [""] * max(len(y_ticks) - len(y_axis_tick_labels), 0))
-    if len(x_axis_tick_labels) == 0:
+    if len(y_axis_tick_labels) == 0:
       ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{int(y):,}" if y.is_integer() else f"{y:g}"))
     if y_axis_grid_lines:
       ax.grid(axis = 'y')
