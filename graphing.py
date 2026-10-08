@@ -39,15 +39,16 @@ def interpret_colors(colors, desired_num_colors, entry_type):
 
     return colors[:desired_num_colors]
 
-def interpret_ticks(tick_input, entry_type): #! Update to allow for float inputs
-  tick_input = [int(tick) for tick in tick_input.replace(" ", "").split(",") if tick != ""]
+def interpret_ticks(tick_input, entry_type):
+  tick_input = [float(tick) for tick in tick_input.replace(" ", "").split(",") if tick != ""][:3]
+  num_decimals = max([len(str(val)[str(val).index(".") + 1:]) for val in tick_input])
   match entry_type:
     case "Manual":
       return tick_input
     case "Range":
-      return range(*tick_input)
+      return [val / 10**num_decimals for val in range(*[int(val * 10**num_decimals) for val in tick_input])]
     case "Log Range":
-      return [10**tick for tick in range(*tick_input)]
+      return [10**tick for tick in [val / 10**num_decimals for val in range(*[int(val * 10**num_decimals) for val in tick_input])]]
 
 st.header("Graphing")
 
