@@ -77,7 +77,6 @@ with st.expander(label = "Cleaning"):
 
         #* Variable Type Selection filt
         match type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]):
-
           #* String Variable Type
           case pd.StringDtype | np.dtypes.ObjectDType:
             is_str = type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]) == pd.StringDtype
@@ -96,7 +95,9 @@ with st.expander(label = "Cleaning"):
                 else:
                   st.markdown(f"<div style='padding-top: 9.5px;'>{"Or" if st.session_state.FilterOrGateToggle else "And"}-Gate</div>", unsafe_allow_html = True)
 
-            string_selections = st.multiselect(label = "List Text:", options = None, accept_new_options = True, key = "FilterStringSelections")
+            standard_filters_table = {"description" : []}
+
+            string_selections = st.multiselect(label = "List Text:", options = standard_filters_table[cleaning_col] if cleaning_col in standard_filters_table.keys() else None, accept_new_options = True, key = "FilterStringSelections")
 
             disable_filter_button = False
             filter_function = d.string_filter if is_str else d.list_string_filter

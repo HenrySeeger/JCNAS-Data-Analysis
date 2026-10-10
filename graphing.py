@@ -91,61 +91,90 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
         return rtn
       x_col_name = st.selectbox(label = "Select a Column", disabled = len(data_object_indices) == 0, options = ["No Variable Selected"] + sorted(intersection([set(st.session_state.data_objects[index].applications.keys()) | set(st.session_state.data_objects[index].responses.keys()) for index in data_object_indices])), label_visibility = "collapsed")
       x_col = st.session_state.data_objects[data_object_indices[0]].key_owner(x_col_name)[0][x_col_name] if x_col_name != "No Variable Selected" else ""
-      #! x_col shouldn't be instantiated here, it should be 
 
     #* Variable Grouping
     if x_col_name != "No Variable Selected":
-      #* Datetime type
-      if x_col.dtype == np.dtype("datetime64[us]"):
-        col1, col2 = st.columns([1.5, 10.5], gap = None)
-        with col1:
-          st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
-        with col2:
-          st.selectbox(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = ["No Grouping Selected", "Yearly", "Monthly"], key = "x_groups", accept_new_options = False, label_visibility = "collapsed")
-                                                                                                             #! Add in weekly and daily options
-        col1, col2 = st.columns([2, 10], gap = None)
-        with col1:
-          st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
-        with col2:
-          current_x_options = []
-          start_date = min(x_col)
-          end_date = max(x_col)
-          def current_x_group_items_format(year):
-            return str(year)
-          match st.session_state.x_groups:
-            case "Yearly":
-              current_x_options = range(start_date.year, end_date.year + 1, 1)
-            case "Monthly":
-              current_x_options = [(pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/1"), pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/{pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/1").days_in_month}")) for i in range(start_date.month, 13 + max(end_date.year - start_date.year - 1, 0) * 12 + end_date.month)]
-              def current_x_group_items_format(dates):
-                return f"{dates[0].year}-{str(dates[0].month).zfill(2)}"
-          st.multiselect(label = "current_x_group_items", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group_items", options = current_x_options, label_visibility = "collapsed", format_func = current_x_group_items_format)
+      match type(x_col.dtype):
+        case np.dtypes.DateTime64DType:
+          col1, col2 = st.columns([1.5, 10.5], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
+          with col2:
+            st.selectbox(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = ["No Grouping Selected", "Yearly", "Monthly"], key = "x_groups", accept_new_options = False, label_visibility = "collapsed")
+                                                                                                              #! Add in quarterly option
+          col1, col2 = st.columns([2, 10], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
+          with col2:
+            current_x_options = []
+            start_date = min(x_col)
+            end_date = max(x_col)
+            def current_x_group_items_format(year):
+              return str(year)
+            match st.session_state.x_groups:
+              case "Yearly":
+                current_x_options = range(start_date.year, end_date.year + 1, 1)
+              case "Monthly":
+                current_x_options = [(pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/1"), pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/{pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/1").days_in_month}")) for i in range(start_date.month, 13 + max(end_date.year - start_date.year - 1, 0) * 12 + end_date.month)]
+                def current_x_group_items_format(dates):
+                  return f"{dates[0].year}-{str(dates[0].month).zfill(2)}"
+            st.multiselect(label = "current_x_group_items", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group_items", options = current_x_options, label_visibility = "collapsed", format_func = current_x_group_items_format)
 
-      #* Other (list, string, int)
-      else:
-        col1, col2 = st.columns([1.5, 10.5], gap = None)
-        with col1:
-          st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
-        with col2:
-          def x_groups_change():
-            st.session_state.x_groups_dict = {key : st.session_state.x_groups_dict[key] if key in st.session_state.x_groups_dict.keys() else set() for key in st.session_state.x_groups}
-          st.multiselect(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = None, key = "x_groups", accept_new_options = True, label_visibility = "collapsed", on_change = x_groups_change)
+        case pd.StringDtype:
+          col1, col2 = st.columns([1.5, 10.5], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
+          with col2:
+            def x_groups_change():
+              st.session_state.x_groups_dict = {key : st.session_state.x_groups_dict[key] if key in st.session_state.x_groups_dict.keys() else set() for key in st.session_state.x_groups}
+            st.multiselect(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = None, key = "x_groups", accept_new_options = True, label_visibility = "collapsed", on_change = x_groups_change)
 
-        col1, col2 = st.columns([2.25, 9.75], gap = None)
-        with col1:
-          st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Current Group:</div>", unsafe_allow_html = True)
-        with col2:
-          def current_x_group_change():
-            st.session_state.current_x_group_items = st.session_state.x_groups_dict[st.session_state.current_x_group]
-          st.selectbox(label = "current_x_group", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group", options = st.session_state.x_groups, accept_new_options = x_col_name != "No Variable Selected" and x_col.dtype != np.dtypes.ObjectDType, label_visibility = "collapsed", on_change = current_x_group_change)
+          col1, col2 = st.columns([2.25, 9.75], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Current Group:</div>", unsafe_allow_html = True)
+          with col2:
+            def current_x_group_change():
+              st.session_state.current_x_group_items = st.session_state.x_groups_dict[st.session_state.current_x_group]
+            st.selectbox(label = "current_x_group", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group", options = st.session_state.x_groups, accept_new_options = x_col_name != "No Variable Selected", label_visibility = "collapsed", on_change = current_x_group_change)
 
-        col1, col2 = st.columns([2, 10], gap = None)
-        with col1:
-          st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
-        with col2:
-          def current_x_group_items_change():
-            st.session_state.x_groups_dict[st.session_state.current_x_group] = set(st.session_state.current_x_group_items)
-          st.multiselect(label = "current_x_group_items", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group_items", options = sorted(set(val for val_list in x_col for val in val_list)) if x_col_name != "No Variable Selected" and x_col.dtype == np.dtypes.ObjectDType else [], accept_new_options = x_col_name != "No Variable Selected" and x_col.dtype != np.dtypes.ObjectDType, label_visibility = "collapsed", on_change = current_x_group_items_change)
+          col1, col2 = st.columns([2, 10], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
+          with col2:
+            def current_x_group_items_change():
+              st.session_state.x_groups_dict[st.session_state.current_x_group] = set(st.session_state.current_x_group_items)
+            unique_x_col = list(x_col.unique())
+            unique_x_col.remove(np.nan)
+            st.multiselect(label = "current_x_group_items", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group_items", options = unique_x_col if len(unique_x_col) <= 25 else [], accept_new_options = x_col_name != "No Variable Selected" and len(unique_x_col) > 25, label_visibility = "collapsed", on_change = current_x_group_items_change)
+        
+        case np.dtypes.ObjectDType:
+          col1, col2 = st.columns([1.5, 10.5], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
+          with col2:
+            def x_groups_change():
+              st.session_state.x_groups_dict = {key : st.session_state.x_groups_dict[key] if key in st.session_state.x_groups_dict.keys() else set() for key in st.session_state.x_groups}
+            st.multiselect(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = None, key = "x_groups", accept_new_options = True, label_visibility = "collapsed", on_change = x_groups_change)
+
+          col1, col2 = st.columns([2.25, 9.75], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Current Group:</div>", unsafe_allow_html = True)
+          with col2:
+            def current_x_group_change():
+              st.session_state.current_x_group_items = st.session_state.x_groups_dict[st.session_state.current_x_group]
+            st.selectbox(label = "current_x_group", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group", options = st.session_state.x_groups, label_visibility = "collapsed", on_change = current_x_group_change)
+
+          col1, col2 = st.columns([2, 10], gap = None)
+          with col1:
+            st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
+          with col2:
+            def current_x_group_items_change():
+              st.session_state.x_groups_dict[st.session_state.current_x_group] = set(st.session_state.current_x_group_items)
+            st.multiselect(label = "current_x_group_items", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group_items", options = sorted(set(val for val_list in x_col for val in val_list)) if x_col_name != "No Variable Selected" else [], label_visibility = "collapsed", on_change = current_x_group_items_change)
+          print()
+        
+        case _:
+          st.text(f"Columns with type '{x_col.dtype}' are invalid")
 
   #* Figure Layout
   with st.expander(label = "Figure Layout"):
@@ -326,7 +355,7 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
         legend_new_colors = st.text_input(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", value = "")
 
 #* Bar Plot Specific  
-if st.session_state.GraphTypeSelect in ["Bar Plot"]:
+if st.session_state.GraphTypeSelect  == "Bar Plot":
   with st.expander(label = "Bar Plot Specific"):
     #* Bar Fill Color
     col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
@@ -372,7 +401,7 @@ if st.session_state.GraphTypeSelect in ["Bar Plot"]:
       bar_tick_marks = st.text_input(label = "bar tick marks", label_visibility = "collapsed", placeholder = "0, 1, 2, ...")
 
 #* Pie Chart Specific
-if st.session_state.GraphTypeSelect in ["Pie Chart"]:
+if st.session_state.GraphTypeSelect == "Pie Chart":
   with st.expander(label = "Pie Chart Specific"):
     #* Wedge Fill Color
     col1, col2, col3, col4 = st.columns([2.5, 3.5, 2, 4], gap = None)
@@ -480,6 +509,8 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "
     case "Bar Plot":
       def bar_group_sizes():
         bar_kwargs = {"height" : [], "x" : [], "label" : st.session_state.x_groups_dict, "facecolor" : interpret_colors(bar_fill_colors, len(st.session_state.x_groups_dict), bar_fill_colors_entry_type), "edgecolor" : interpret_colors(bar_edge_colors, len(st.session_state.x_groups_dict), bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None}
+        # st.text(type(st.session_state.data_objects[cleaning_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]))
+        st.text(type(st.session_state.data_objects[data_object_indices[0]].key_owner(x_col_name)[0][x_col_name].dtype) == pd.StringDtype)
         match type(st.session_state.data_objects[data_object_indices[0]].key_owner(x_col_name)[0].dtypes[x_col_name]):
           case np.dtypes.ObjectDType:
             bar_kwargs["height"] = [len([col for col in x_col if len(group & set(col)) > 0]) for group in st.session_state.x_groups_dict.values()]
