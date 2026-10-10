@@ -104,7 +104,7 @@ class DataObject:
     if key in self.responses:
       self.responses = self.responses[~self.responses[key].isin(list_strings_target)]
   
-  def add_action_history(self, filter_code: str, dataset, column, **kwargs) -> None:
+  def add_action_history(self, **kwargs) -> None:
     """
     Updates the DataObject's filtration history. It also updates the other datasets that weren't directly filtered
 
@@ -113,7 +113,7 @@ class DataObject:
       column (any): The name of the column the filter was applied to. Likely a string.
       **kwargs: Any keyword arguments relevent to the method of filtration. Each method will have its own standard format.
     """
-    self.action_history.append({"filter_code" : filter_code, "dataset" : dataset, "column" : column} | kwargs)
+    self.action_history.append(kwargs)
   
   def undo(self) -> list:
     """
@@ -543,3 +543,5 @@ def green_keywords(df): #243 key words/phrases
 
   df["green_keywords"] = [[category for category, pattern in green_terms_table.items() if type(text) == str and re.search(pattern, text, flags = re.IGNORECASE)] for text in df["description"]]
 
+
+# def code_to_action()
