@@ -144,251 +144,232 @@ class DataObject:
     return str(self.action_history)[1:-1]
 
 
-def string_values_replace(replace_data_object_index, replace_col, *args):
-  obj = st.session_state.data_objects[replace_data_object_index]
-  st.session_state.ReplaceStringSelectionsTarget = []
-  st.session_state.ReplaceStringSelectionsNew = []
-  list_target, list_new = args
+def remove_duplicates(data_object_index, column):
+  data_object = st.session_state.data_objects[data_object_index]
 
-  for dataset in obj.key_owner(replace_col):
-    match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceInclusionToggle, st.session_state.ReplaceCaseSensitiveToggle):
-      case (True, True, True) | (True, True, False):
-        dataset.fillna(value = {replace_col : list_new[0]}, inplace = True)
+  if column in data_object.applications.keys():
+    data_object.applications.drop_duplicates(subset = column, inplace = True)
+
+  if column in data_object.responses.keys():
+    data_object.responses.drop_duplicates(subset = column, inplace = True)
+    
+  st.toast(body = f"Successfully removed duplicate values")
+
+def string_filter(data_object_index, column, include_values, remove_none, exact_string, case_sensitive, or_gate, string_values):
+  dataset = st.session_state.data_objects[data_object_index]
+  col_series = dataset.key_owner(column)[0][column]
+  mask = pd.Series(False if or_gate else True, index = col_series.index)
+
+  if len(string_values) != 0:
+    match (or_gate, exact_string, case_sensitive):
+      case (True, True, True):
+        mask |= col_series.isin(string_values)
+      case (True, True, False):
+        mask |= col_series.str.lower().isin([string.lower() for string in string_values])
       case (True, False, True) | (True, False, False):
-        dataset.loc[dataset[replace_col] is not None, replace_col] = list_new[0]
+        mask |= col_series.str.contains("|".join(string_values), case = case_sensitive, na = False)
       case (False, True, True):
-        dataset.replace(to_replace = {replace_col : {target : new for target, new in zip(list_target, list_new)}}, inplace = True)
+        for string in string_values:
+          mask &= col_series.isin(string)
       case (False, True, False):
-        for target, new in zip(list_target, list_new):
-          dataset[replace_col] = dataset[replace_col].str.replace(target, new, case = False)
-      case (False, False, True):
-        dataset.loc[~dataset[replace_col].isin(list_target), replace_col] = list_new[0]
-      case (False, False, False):
-        dataset.loc[~dataset[replace_col].str.lower().isin(list_target), replace_col] = list_new[0]
+        for string in string_values:
+          mask &= col_series.str.lower().isin(string.lower())
+      case (False, False, True) | (False, False, False):
+        for string in string_values:
+          mask &= col_series.str.contains(string, case = case_sensitive, na = False)
 
-  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
-
-def values_replace(replace_data_object_index, replace_col, *args): #* Int and Date
-  obj = st.session_state.data_objects[replace_data_object_index]
-  st.session_state.ReplaceIntSelectionsTarget = []
-  st.session_state.ReplaceIntSelectionsNew = []
-  st.session_state.ReplaceDateSelectionsTarget = []
-  st.session_state.ReplaceDateSelectionsNew = []
-  list_target, list_new = args
-
-  for dataset in obj.key_owner(replace_col):
-    match (st.session_state.ReplaceNoneToggle, st.session_state.ReplaceInclusionToggle):
-      case (True, True):
-        dataset.fillna(value = {replace_col : list_new[0]}, inplace = True)
-      case (True, False):
-        dataset.loc[dataset[replace_col] is not None, replace_col] = list_new[0]
-      case (False, True):
-        dataset.replace(to_replace = {replace_col : {target : new for target, new in zip(list_target, list_new)}}, inplace = True)
-      case (False, False):
-        dataset.loc[~dataset[replace_col].isin(list_target), replace_col] = list_new[0]
-
-  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
-
-def bounds_replace(replace_data_object_index, replace_col, *args):
-  obj = st.session_state.data_objects[replace_data_object_index]
-  st.session_state.ReplaceIntLowerBound = None
-  st.session_state.ReplaceIntUpperBound = None
-  st.session_state.ReplaceIntNewBound = None
-  st.session_state.ReplaceDateEarlierBound = None
-  st.session_state.ReplaceDateLaterBound = None
-  st.session_state.ReplaceDateNewBound = None
-  lower_bound, upper_bound, replace_bound = args
-
-  for dataset in obj.key_owner(replace_col):
-    match(st.session_state.ReplaceNoneToggle, st.session_state.ReplaceInclusionToggle):
-      case (True, True): # Replace empty entries
-        dataset.fillna(value = {replace_col : replace_bound})
-      case (True, False): # Replace non-empty entries
-        dataset.loc[dataset[replace_col] != None] = replace_bound
-      case (False, True): # Replace bounded entries
-        dataset.loc[(True if lower_bound is None else lower_bound <= dataset[replace_col]) & 
-                    (True if upper_bound is None else upper_bound >= dataset[replace_col]), replace_col] = replace_bound
-      case (False, False): # Replace entries outside the bounds
-        dataset.loc[(True if lower_bound is None else lower_bound > dataset[replace_col]) |
-                    (True if upper_bound is None else upper_bound < dataset[replace_col]), replace_col] = replace_bound
-
-  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
-
-
-def string_filter(filter_data_object_index, filter_col, *args):
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterStringSelections = []
-  list_strings, = args
-  mask = pd.Series(False if st.session_state.FilterOrGateToggle else True, index = column.index)
-
-  if len(list_strings) != 0:
-    if st.session_state.FilterOrGateToggle:
-      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
-        case (True, True):
-          mask |= column.isin(list_strings)
-        case (True, False):
-          mask |= column.str.lower().isin([string.lower() for string in list_strings])
-        case (False, True) | (False, False):
-          mask |= column.str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
-    else:
-      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
-        case (True, True):
-          for string in list_strings:
-            mask &= column.isin(string)
-        case (True, False):
-          for string in list_strings:
-            mask &= column.str.lower().isin(string.lower())
-        case (False, True) | (False, False):
-          for string in list_strings:
-            mask &= column.str.contains(string, case = st.session_state.FilterCaseSensitiveToggle, na = False)
-
-    if not st.session_state.FilterInclusionToggle:
+    if not include_values:
       mask = ~mask
   else:
-    mask |= ~column.isna()
+    mask |= ~col_series.isna()
 
-  if not st.session_state.FilterNoneToggle:
-    mask |= column.isna()
+  if not remove_none:
+    mask |= col_series.isna()
 
-  dataset.filter_owner(filter_col, mask)
+  dataset.filter_owner(column, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
-def list_string_filter(filter_data_object_index, filter_col, *args):
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterStringSelections = []
-  list_strings, = args
-  mask = pd.Series(False if st.session_state.FilterOrGateToggle else True, index = column.index)
+def list_string_filter(data_object_index, column, include_values, remove_none, exact_string, case_sensitive, or_gate, string_values):
+  dataset = st.session_state.data_objects[data_object_index]
+  col_series = dataset.key_owner(column)[0][column]
+  mask = pd.Series(False if or_gate else True, index = col_series.index)
 
-  if len(list_strings) != 0:
-    if st.session_state.FilterOrGateToggle:
-      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
-        case (True, True):
-          mask |= pd.Series([bool([string for string in list_strings if string in vals]) for vals in column])
-        case (True, False):
-          list_strings_lower = [string.lower() for string in list_strings]
-          mask |= pd.Series([bool([string for string in list_strings_lower if string in vals]) for vals in column.str.lower()])
-        case (False, True) | (False, False):
-          mask |= column.map(lambda items: ";;".join(items)).str.contains("|".join(list_strings), case = st.session_state.FilterCaseSensitiveToggle, na = False)
-    else:
-      match (st.session_state.FilterExactStringToggle, st.session_state.FilterCaseSensitiveToggle):
-        case (True, True):
-          for string in list_strings:
-            mask &= pd.Series([string in vals for vals in column])
-        case (True, False):
-          for string in [string.lower() for string in list_strings]:
-            mask &= pd.Series([string in vals for vals in column.str.lower()])
-        case (False, True) | (False, False):
-          temp_column = column.copy().map(lambda items: ";;".join(items))
-          for string in list_strings:
-            mask &= temp_column.str.contains(string, case = st.session_state.FilterCaseSensitiveToggle, na = False)
+  if len(string_values) != 0:
+    match (or_gate, exact_string, case_sensitive):
+      case (True, True, True):
+        mask |= pd.Series([bool([string for string in string_values if string in vals]) for vals in col_series])
+      case (True, True, False):
+        string_values_lower = [string.lower() for string in string_values]
+        mask |= pd.Series([bool([string for string in string_values_lower if string in vals]) for vals in col_series.str.lower()])
+      case (True, False, True) | (True, False, False):
+        mask |= col_series.map(lambda items: ";;".join(items)).str.contains("|".join(string_values), case = case_sensitive, na = False)
+      case (False, True, True):
+        for string in string_values:
+          mask &= pd.Series([string in vals for vals in col_series])
+      case (False, True, False):
+        for string in [string.lower() for string in string_values]:
+          mask &= pd.Series([string in vals for vals in col_series.str.lower()])
+      case (False, False, True) | (False, False, False):
+        temp_column = col_series.copy().map(lambda items: ";;".join(items))
+        for string in string_values:
+          mask &= temp_column.str.contains(string, case = case_sensitive, na = False)
 
-    if not st.session_state.FilterInclusionToggle:
+    if not include_values:
       mask = ~mask
   else:
-    mask |= column.str.len() != 0
+    mask |= col_series.str.len() != 0
 
-  if not st.session_state.FilterNoneToggle:
-    mask |= column.str.len() == 0
+  if not remove_none:
+    mask |= col_series.str.len() == 0
 
-  dataset.filter_owner(filter_col, mask)
+  dataset.filter_owner(column, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
-def int_bounds_filter(filter_data_object_index, filter_col, *args):
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterIntLowerBound = None
-  st.session_state.FilterIntUpperBound = None
-  int_lower_bound, int_upper_bound = args
+def int_bounds_filter(data_object_index, column, include_values, remove_none, int_lower_bound, int_upper_bound):
+  dataset = st.session_state.data_objects[data_object_index]
+  col_series = dataset.key_owner(column)[0][column]
 
-  if st.session_state.FilterInclusionToggle:
-    mask = pd.Series(True, index = column.index)
+  if include_values:
+    mask = pd.Series(True, index = col_series.index)
     if int_upper_bound:
-      mask &= column <= int_upper_bound
+      mask &= col_series <= int_upper_bound
     if int_lower_bound:
-      mask &= column >= int_lower_bound
+      mask &= col_series >= int_lower_bound
   else:
-    mask = pd.Series(False, index = column.index)
+    mask = pd.Series(False, index = col_series.index)
     if int_upper_bound:
-      mask |= column > int_upper_bound
+      mask |= col_series > int_upper_bound
     if int_lower_bound:
-      mask |= column < int_lower_bound
+      mask |= col_series < int_lower_bound
 
-  if not st.session_state.FilterNoneToggle:
-    mask |= column.isna()      
+  if not remove_none:
+    mask |= col_series.isna()      
 
-  dataset.filter_owner(filter_col, mask)
+  dataset.filter_owner(column, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
-def int_values_filter(filter_data_object_index, filter_col, *args):
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterIntSelections = []
-  int_selections, = args
-  int_selections = [int(num) for num in int_selections]
-  mask = pd.Series(False, index = column.index)
+def int_values_filter(data_object_index, column, include_values, remove_none, int_values):
+  dataset = st.session_state.data_objects[data_object_index]
+  col_series = dataset.key_owner(column)[0][column]
+  mask = pd.Series(False, index = col_series.index)
 
-  if st.session_state.FilterInclusionToggle:
-    mask |= column.isin(int_selections)
+  if include_values:
+    mask |= col_series.isin(int_values)
   else:
-    mask |= ~column.isin(int_selections)
+    mask |= ~col_series.isin(int_values)
 
-  if not st.session_state.FilterNoneToggle:
-    mask |= column.isna()
+  if not remove_none:
+    mask |= col_series.isna()
 
-  dataset.filter_owner(filter_col, mask)
+  dataset.filter_owner(column, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
-def date_bounds_filter(filter_data_object_index, filter_col, *args):
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterDateEarlierBound = None
-  st.session_state.FilterDateLaterBound = None
-  date_earlier_bound, date_later_bound = args
+def date_bounds_filter(data_object_index, column, include_values, remove_none, date_earlier_bound, date_later_bound):
+  dataset = st.session_state.data_objects[data_object_index]
+  col_series = dataset.key_owner(column)[0][column]
 
   if date_earlier_bound:
     date_earlier_timestamp = pd.Timestamp(date_earlier_bound)
   if date_later_bound:
     date_later_timestamp = pd.Timestamp(date_later_bound) + pd.Timedelta(days = 1)
 
-  if st.session_state.FilterInclusionToggle:
-    mask = pd.Series(True, index = column.index)
+  if include_values:
+    mask = pd.Series(True, index = col_series.index)
     if date_earlier_bound:
-      mask &= column >= date_earlier_timestamp
+      mask &= col_series >= date_earlier_timestamp
     if date_later_bound:
-      mask &= column < date_later_timestamp
+      mask &= col_series < date_later_timestamp
   else:
-    mask = pd.Series(False, index = column.index)
+    mask = pd.Series(False, index = col_series.index)
     if date_earlier_bound:
-      mask |= column < date_earlier_timestamp
+      mask |= col_series < date_earlier_timestamp
     if date_later_bound:
-      mask |= column >= date_later_timestamp
+      mask |= col_series >= date_later_timestamp
 
-  if st.session_state.FilterNoneToggle:
-    mask |= column.isna()
+  if remove_none:
+    mask |= col_series.isna()
 
-  dataset.filter_owner(filter_col, mask)
+  dataset.filter_owner(column, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
 
-def date_values_filter(filter_data_object_index, filter_col, *args):
-  dataset = st.session_state.data_objects[filter_data_object_index]
-  column = dataset.key_owner(filter_col)[0][filter_col]
-  st.session_state.FilterDateSelections = []
-  date_area, = args
-  date_area = [pd.Timestamp(date) for date in date_area]
-  mask = pd.Series(False, index = column.index)
+def date_values_filter(data_object_index, column, include_values, remove_none, date_values):
+  dataset = st.session_state.data_objects[data_object_index]
+  col_series = dataset.key_owner(column)[0][column]
+  mask = pd.Series(False, index = col_series.index)
 
-  if st.session_state.FilterInclusionToggle:
-    mask |= column.isin(date_area)
+  if include_values:
+    mask |= col_series.isin(date_values)
   else:
-    mask |= ~column.isin(date_area)
+    mask |= ~col_series.isin(date_values)
 
-  if st.session_state.FilterNoneToggle:
-    mask |= column.isna()
+  if remove_none:
+    mask |= col_series.isna()
 
-  dataset.filter_owner(filter_col, mask)
+  dataset.filter_owner(column, mask)
   st.toast(body = f"'{dataset.name}' successfully filtered")
+
+def delete_column(data_object_index, column):
+  if column in st.session_state.data_objects[data_object_index].applications.keys():
+    st.session_state.data_objects[data_object_index].applications.drop(columns = column, inplace = True)
+  if column in st.session_state.data_objects[data_object_index].responses.keys():
+    st.session_state.data_objects[data_object_index].responses.drop(columns = column, inplace = True)
+  st.toast(body = f"Successfully removed '{column}' from '{st.session_state.data_objects[data_object_index].name}'")
+
+
+def string_values_replace(data_object_index, column, replace_selected, replace_none, case_sensitive, target_values, new_values):
+  obj = st.session_state.data_objects[data_object_index]
+
+  for dataset in obj.key_owner(column):
+    match (replace_none, replace_selected, case_sensitive):
+      case (True, True, True) | (True, True, False):
+        dataset.fillna(value = {column : new_values[0]}, inplace = True)
+      case (True, False, True) | (True, False, False):
+        dataset.loc[dataset[column] is not None, column] = new_values[0]
+      case (False, True, True):
+        dataset.replace(to_replace = {column : {target : new for target, new in zip(target_values, new_values)}}, inplace = True)
+      case (False, True, False):
+        for target, new in zip(target_values, new_values):
+          dataset[column] = dataset[column].str.replace(target, new, case = False)
+      case (False, False, True):
+        dataset.loc[~dataset[column].isin(target_values), column] = new_values[0]
+      case (False, False, False):
+        dataset.loc[~dataset[column].str.lower().isin(target_values), column] = new_values[0]
+
+  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
+
+def bounds_replace(data_object_index, column, replace_selected, replace_none, lower_bound, upper_bound, new_bound):
+  obj = st.session_state.data_objects[data_object_index]
+
+  for dataset in obj.key_owner(column):
+    match(replace_none, replace_selected):
+      case (True, True): # Replace empty entries
+        dataset.fillna(value = {column : new_bound})
+      case (True, False): # Replace non-empty entries
+        dataset.loc[dataset[column] != None] = new_bound
+      case (False, True): # Replace bounded entries
+        dataset.loc[(True if lower_bound is None else lower_bound <= dataset[column]) & 
+                    (True if upper_bound is None else upper_bound >= dataset[column]), column] = new_bound
+      case (False, False): # Replace entries outside the bounds
+        dataset.loc[(True if lower_bound is None else lower_bound > dataset[column]) |
+                    (True if upper_bound is None else upper_bound < dataset[column]), column] = new_bound
+
+  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
+
+def values_replace(data_object_index, column, replace_selected, replace_none, target_values, new_values):
+  obj = st.session_state.data_objects[data_object_index]
+
+  for dataset in obj.key_owner(column):
+    match (replace_none, replace_selected):
+      case (True, True):
+        dataset.fillna(value = {column : new_values[0]}, inplace = True)
+      case (True, False):
+        dataset.loc[dataset[column] is not None, column] = new_values[0]
+      case (False, True):
+        dataset.replace(to_replace = {column : {target : new for target, new in zip(target_values, new_values)}}, inplace = True)
+      case (False, False):
+        dataset.loc[~dataset[column].isin(target_values), column] = new_values[0]
+
+  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
 
 
 def period_or_date_to_charities(df):
@@ -544,4 +525,19 @@ def green_keywords(df): #243 key words/phrases
   df["green_keywords"] = [[category for category, pattern in green_terms_table.items() if type(text) == str and re.search(pattern, text, flags = re.IGNORECASE)] for text in df["description"]]
 
 
-# def code_to_action()
+def action_code_interpreter(data_object_index, action_details: dict):
+  st.session_state.data_objects[data_object_index].add_action_history(**action_details)
+  action_table = {"drop_duplicates" : remove_duplicates,
+                  "filter_string" : string_filter,
+                  "filter_list_string" : list_string_filter,
+                  "filter_int_bound" : int_bounds_filter,
+                  "filter_int_values" : int_values_filter,
+                  "filter_date_bound" : date_bounds_filter,
+                  "filter_date_values" : date_values_filter,
+                  "deletion" : delete_column,
+                  "replace_string" : string_values_replace,
+                  "replace_int_bound" : bounds_replace,
+                  "replace_int_values" : values_replace,
+                  "replace_date_bound" : bounds_replace,
+                  "replace_date_values" : values_replace}
+  action_table[action_details.pop("action_code")](data_object_index, **action_details)
