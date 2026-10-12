@@ -6,6 +6,7 @@ import streamlit as st
 import DataObject as d
 import matplotlib.pyplot as plt
 
+st.session_state.setdefault("master_data", None)
 st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("filter_state", None)
 st.session_state.setdefault("ReplaceNoneToggle", False)
