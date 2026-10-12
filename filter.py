@@ -37,9 +37,11 @@ with st.expander(label = "Cleaning"):
     #* Remove Duplicates
     with tab_duplicates:
 
-      if st.button(label = "Remove Duplicates"):
+      def remove_duplicates():
         d.action_code_interpreter(action_data_object_index, {"action_code" : "drop_duplicates","column" : cleaning_col})
         st.session_state.CleaningColumn = "Select a Column"
+        st.toast(body = f"Successfully removed duplicate values")
+      st.button(label = "Remove Duplicates", on_click = remove_duplicates)
 
     #* Filter Values
     with tab_filter:
@@ -93,9 +95,11 @@ with st.expander(label = "Cleaning"):
                                       "exact_string" : st.session_state.FilterExactStringToggle,
                                       "case_sensitive" : st.session_state.FilterCaseSensitiveToggle,
                                       "or_gate" : st.session_state.FilterOrGateToggle}
-            if st.button(label = "Filter"):
+            def filter():
               d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
-              string_selections = []
+              st.session_state.FilterStringSelections = []
+              st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
+            st.button(label = "Filter", on_click = filter)
 
           #* Integer Variable Type
           case np.dtypes.Int64DType:
@@ -125,10 +129,12 @@ with st.expander(label = "Cleaning"):
                                         "int_lower_bound" : int_lower_bound,
                                         "int_upper_bound" : int_upper_bound}
 
-              if st.button(label = "Filter", disabled = disable_filter_button):
+              def filter():
                 d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
-                int_lower_bound = None
-                int_upper_bound = None
+                st.session_state.FilterIntLowerBound = None
+                st.session_state.FilterIntUpperBound = None
+                st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
+              st.button(label = "Filter", disabled = disable_filter_button, on_click = filter)
 
             #* List of Integers
             elif int_tabs == "Individual Values":
@@ -150,9 +156,11 @@ with st.expander(label = "Cleaning"):
                   st.markdown(":red[Only integers are allowed.]")
                 disable_filter_button = True
 
-              if st.button(label = "Filter", disabled = disable_filter_button):
+              def filter():
                 d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
-                int_selections = []
+                st.session_state.FilterIntSelections = []
+                st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
+              st.button(label = "Filter", disabled = disable_filter_button, on_click = filter)
             
           #* DateTime Variable Type
           case np.dtypes.DateTime64DType:
@@ -182,10 +190,12 @@ with st.expander(label = "Cleaning"):
                                         "date_earlier_bound" : date_earlier_bound,
                                         "date_later_bound" : date_later_bound}
 
-              if st.button(label = "Filter", disabled = disable_filter_button):
+              def filter():
                 d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
-                date_earlier_bound = None
-                date_later_bound = None
+                st.session_state.FilterDateEarlierBound = None
+                st.session_state.FilterDateLaterBound = None
+                st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
+              st.button(label = "Filter", disabled = disable_filter_button, on_click = filter)
 
           #* List of Dates
             elif date_tabs == "Individual Dates":
@@ -205,17 +215,21 @@ with st.expander(label = "Cleaning"):
                 st.markdown(":red[Only dates ('YYYY/MM/DD') are allowed.]")
                 disable_filter_button = True
 
-              if st.button(label = "Filter", disabled = disable_filter_button):
+              def filter():
                 d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
-                date_selections = []
+                st.session_state.FilterDateSelections = []
+                st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
+              st.button(label = "Filter", disabled = disable_filter_button, on_click = filter)
 
     #* Delete a Column
     with tab_remove_col:
       data_delete_confirmation = st.toggle(label = f"Confirm removal of {cleaning_col}", value = False)
 
-      if st.button(label = f"Remove '{cleaning_col}' from '{st.session_state.data_objects[action_data_object_index].name}'", disabled = not data_delete_confirmation):
+      def remove_column():
         d.action_code_interpreter(action_data_object_index, {"action_code" : "deletion","column" : cleaning_col})
         st.session_state.CleaningColumn = "Select a Column"
+        st.toast(body = f"Successfully removed '{cleaning_col}' from '{st.session_state.data_objects[action_data_object_index].name}'")
+      st.button(label = f"Remove '{cleaning_col}' from '{st.session_state.data_objects[action_data_object_index].name}'", disabled = not data_delete_confirmation, on_click = remove_column)
 
 #* Replacement Section
 with st.expander(label = "Replacing"):
@@ -229,20 +243,15 @@ with st.expander(label = "Replacing"):
 
   if replace_col not in [None, "Select a Column"]:
     #* None Replacement Toggle & Removal Toggle
-    for i, col in enumerate(st.columns([1, 3.76 if st.session_state.ReplaceNoneToggle else 2.5, 1, 12.24 if st.session_state.ReplaceNoneToggle else 13.5], gap = "xxsmall", border = False)):
-      with col:
-        if i == 0:
-          st.toggle(label = "label", key = "ReplaceNoneToggle", value = False, label_visibility = "collapsed")
-        elif i == 1:
-          st.markdown(f"<div style='padding-top: 9.5px;'>{"Entries" if not st.session_state.ReplaceNoneToggle else "Empty Entries"}</div>", unsafe_allow_html = True)
-        elif i == 2:
-          st.toggle(label = "Inlcude", key = "ReplaceInclusionToggle", value = True, label_visibility = "collapsed")
-        else:
-          st.markdown(f"<div style='padding-top: 9.5px;'>Replace {"" if st.session_state.ReplaceInclusionToggle else "Non-"}Selected Bounds/Values</div>", unsafe_allow_html = True)
-
-    disable_replace_button = True
-    replace_function = None
-    replace_function_kwargs = None
+    col1, col2, col3, col4 = st.columns([1, 3.76 if st.session_state.ReplaceNoneToggle else 2.5, 1, 12.24 if st.session_state.ReplaceNoneToggle else 13.5], gap = "xxsmall", border = False)
+    with col1:
+        st.toggle(label = "label", key = "ReplaceNoneToggle", value = False, label_visibility = "collapsed")
+    with col2:
+        st.markdown(f"<div style='padding-top: 9.5px;'>{"Entries" if not st.session_state.ReplaceNoneToggle else "Empty Entries"}</div>", unsafe_allow_html = True)
+    with col3:
+        st.toggle(label = "Inlcude", key = "ReplaceInclusionToggle", value = True, label_visibility = "collapsed")
+    with col4:
+        st.markdown(f"<div style='padding-top: 9.5px;'>Replace {"" if st.session_state.ReplaceInclusionToggle else "Non-"}Selected Bounds/Values</div>", unsafe_allow_html = True)
       
     #* Variable Type Selection 
     match type(st.session_state.data_objects[action_data_object_index].key_owner(replace_col)[0].dtypes[replace_col]):
@@ -270,10 +279,12 @@ with st.expander(label = "Replacing"):
                                    "target_values" : string_selections_target, 
                                    "new_values" : string_selections_new}
         
-        if st.button(label = "Filter", disabled = disable_replace_button):
+        def replace():
           d.action_code_interpreter(action_data_object_index, replace_function_kwargs)
-          string_selections_target = []
-          string_selections_new = []
+          st.session_state.ReplaceStringSelectionsTarget = []
+          st.session_state.ReplaceStringSelectionsNew = []
+          st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
+        st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
 
       #* Integer Variable Type
       case np.dtypes.Int64DType:
@@ -306,11 +317,13 @@ with st.expander(label = "Replacing"):
                                      "upper_bound" : int_upper_bound,
                                      "new_values" : int_new_bound}
 
-          if st.button(label = "Filter", disabled = disable_replace_button):
+          def replace():
             d.action_code_interpreter(action_data_object_index, replace_function_kwargs)
-            int_lower_bound = None
-            int_upper_bound = None
-            int_new_bound = None
+            st.session_state.ReplaceIntLowerBound = None
+            st.session_state.ReplaceIntUpperBound = None
+            st.session_state.ReplaceIntBoundNew = None
+            st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
+          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
 
         #* List of Integers
         elif replace_int_tabs == "Individual Values":
@@ -337,10 +350,12 @@ with st.expander(label = "Replacing"):
               st.markdown(":red[Only integers are allowed.]")
             disable_replace_button = True
 
-          if st.button(label = "Filter", disabled = disable_replace_button):
+          def replace():
             d.action_code_interpreter(action_data_object_index, replace_function_kwargs)
-            int_selections_target = []
-            int_selections_new = []
+            st.session_state.ReplaceIntSelectionsTarget = []
+            st.session_state.ReplaceIntSelectionsNew = []
+            st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
+          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
 
       #* DateTime Variable Type
       case np.dtypes.DateTime64DType:
@@ -365,7 +380,6 @@ with st.expander(label = "Replacing"):
 
 #                                                      trying to replace entries without either bound entered                             trying to replace entries without a new value
           disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_earlier_bound == None and date_later_bound == None) or (date_new_bound is None)
-          replace_function = d.bounds_replace
           replace_function_kwargs = {"action_code" : "replace_date_bound", 
                                      "dataset" : st.session_state.data_objects[action_data_object_index].key_owner_name(replace_col),
                                      "column" : replace_col,
@@ -375,11 +389,13 @@ with st.expander(label = "Replacing"):
                                      "later_bound" : pd.Timestamp(date_earlier_bound),
                                      "new_bound" : pd.Timestamp(date_new_bound)}
 
-          if st.button(label = "Filter", disabled = disable_replace_button):
+          def replace():
             d.action_code_interpreter(action_data_object_index, replace_function_kwargs)
-            date_earlier_bound = None
-            date_later_bound = None
-            date_later_bound = None
+            st.session_state.ReplaceDateEarlierBound = None
+            st.session_state.ReplaceDateLaterBound = None
+            st.session_state.ReplaceDateBoundNew = None
+            st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}' ")
+          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
 
       #* List of Dates
         elif date_tabs == "Individual Dates":
@@ -406,10 +422,12 @@ with st.expander(label = "Replacing"):
             st.markdown(":red[Only dates ('YYYY/MM/DD') are allowed.]")
             disable_replace_button = True
 
-          if st.button(label = "Filter", disabled = disable_replace_button):
+          def replace():
             d.action_code_interpreter(action_data_object_index, replace_function_kwargs)
-            date_selections_target = []
-            date_selections_new = []
+            st.session_state.ReplaceDateAreaTarget = []
+            st.session_state.ReplaceDateAreaNew = []
+            st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
+          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
 
 with st.expander(label = "Merging"):
   st.text("Coming in v2.0")
@@ -430,4 +448,6 @@ with st.expander(label = "View Datasets"):
 
 if action_data_object_index != "Select a Data Object" and len(st.session_state.data_objects[action_data_object_index].action_history):
   with st.expander(label = "View Dataset History", expanded = True):
+    if st.button(label = "Undo", disabled = not (action_data_object_index != "Select a Data Object" and len(st.session_state.data_objects[action_data_object_index].action_history))):
+      d.undo(action_data_object_index)
     st.text(" - " + str(st.session_state.data_objects[action_data_object_index].action_history)[1:-1].replace("}, ", "\n - ").replace("{", "").replace("}", "").replace("'", ""))

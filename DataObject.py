@@ -143,7 +143,7 @@ class DataObject:
     """
     return str(self.action_history)[1:-1]
 
-
+  
 def remove_duplicates(data_object_index, column):
   data_object = st.session_state.data_objects[data_object_index]
 
@@ -152,8 +152,6 @@ def remove_duplicates(data_object_index, column):
 
   if column in data_object.responses.keys():
     data_object.responses.drop_duplicates(subset = column, inplace = True)
-    
-  st.toast(body = f"Successfully removed duplicate values")
 
 def string_filter(data_object_index, column, include_values, remove_none, exact_string, case_sensitive, or_gate, string_values):
   dataset = st.session_state.data_objects[data_object_index]
@@ -187,7 +185,6 @@ def string_filter(data_object_index, column, include_values, remove_none, exact_
     mask |= col_series.isna()
 
   dataset.filter_owner(column, mask)
-  st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def list_string_filter(data_object_index, column, include_values, remove_none, exact_string, case_sensitive, or_gate, string_values):
   dataset = st.session_state.data_objects[data_object_index]
@@ -223,7 +220,6 @@ def list_string_filter(data_object_index, column, include_values, remove_none, e
     mask |= col_series.str.len() == 0
 
   dataset.filter_owner(column, mask)
-  st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def int_bounds_filter(data_object_index, column, include_values, remove_none, int_lower_bound, int_upper_bound):
   dataset = st.session_state.data_objects[data_object_index]
@@ -262,7 +258,6 @@ def int_values_filter(data_object_index, column, include_values, remove_none, in
     mask |= col_series.isna()
 
   dataset.filter_owner(column, mask)
-  st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def date_bounds_filter(data_object_index, column, include_values, remove_none, date_earlier_bound, date_later_bound):
   dataset = st.session_state.data_objects[data_object_index]
@@ -290,7 +285,6 @@ def date_bounds_filter(data_object_index, column, include_values, remove_none, d
     mask |= col_series.isna()
 
   dataset.filter_owner(column, mask)
-  st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def date_values_filter(data_object_index, column, include_values, remove_none, date_values):
   dataset = st.session_state.data_objects[data_object_index]
@@ -306,14 +300,12 @@ def date_values_filter(data_object_index, column, include_values, remove_none, d
     mask |= col_series.isna()
 
   dataset.filter_owner(column, mask)
-  st.toast(body = f"'{dataset.name}' successfully filtered")
 
 def delete_column(data_object_index, column):
   if column in st.session_state.data_objects[data_object_index].applications.keys():
     st.session_state.data_objects[data_object_index].applications.drop(columns = column, inplace = True)
   if column in st.session_state.data_objects[data_object_index].responses.keys():
     st.session_state.data_objects[data_object_index].responses.drop(columns = column, inplace = True)
-  st.toast(body = f"Successfully removed '{column}' from '{st.session_state.data_objects[data_object_index].name}'")
 
 
 def string_values_replace(data_object_index, column, replace_selected, replace_none, case_sensitive, target_values, new_values):
@@ -335,8 +327,6 @@ def string_values_replace(data_object_index, column, replace_selected, replace_n
       case (False, False, False):
         dataset.loc[~dataset[column].str.lower().isin(target_values), column] = new_values[0]
 
-  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
-
 def bounds_replace(data_object_index, column, replace_selected, replace_none, lower_bound, upper_bound, new_bound):
   obj = st.session_state.data_objects[data_object_index]
 
@@ -352,8 +342,6 @@ def bounds_replace(data_object_index, column, replace_selected, replace_none, lo
       case (False, False): # Replace entries outside the bounds
         dataset.loc[(True if lower_bound is None else lower_bound > dataset[column]) |
                     (True if upper_bound is None else upper_bound < dataset[column]), column] = new_bound
-
-  st.toast(body = f"Successfully replaced entries in '{obj.name}'")
 
 def values_replace(data_object_index, column, replace_selected, replace_none, target_values, new_values):
   obj = st.session_state.data_objects[data_object_index]
@@ -372,7 +360,9 @@ def values_replace(data_object_index, column, replace_selected, replace_none, ta
   st.toast(body = f"Successfully replaced entries in '{obj.name}'")
 
 
-def period_or_date_to_charities(df):
+def period_or_date_to_charities(data_object_index):
+  df = st.session_state.data_objects[data_object_index].applications
+
   def normalize_period(col):
     col = col.fillna("")
     col = col.str.strip()
@@ -501,7 +491,7 @@ def period_or_date_to_charities(df):
   #* Adds the Council for British Archaeology
   df["charities"] = pd.Series([charities + (["cba"] if type(description) == str and (app_type in ["Church", "Cathedral"] or re.search(r"ecclesiastical", description, flags = re.IGNORECASE) or "cba" in [time_period_reference_table[other.lower()] for other in others]) else []) for charities, app_type, description, others in zip(df["charities"], df["application_type"], df["description"], merged_df["other"])])
 
-def green_keywords(df): #243 key words/phrases
+def green_keywords(data_object_index): #243 key words/phrases
   green_terms_table = {"climate change adaptation" : r"climate[-\s]resilience|climate[-\s]adaptation|adaptation[-\s]measures|resilience[-\s]measures|future[-\s]proofing|flood[-\s]resilience|flood[-\s]resistance|overheating[-\s]mitigation|thermal[-\s]comfort|sustainable[-\s]drainage|rainwater[-\s]management|surface[-\s]water[-\s]management|water[-\s]efficiency|drought[-\s]resilience|green[-\s]infrastructure|biodiversity[-\s]enhancement|nature[-\s]based[-\s]solutions",
                        "energy efficiency" : r"energy[-\s]efficiency[-\s]improvements|thermal[-\s]upgrade|fabric[-\s]first[-\s]approach|building[-\s]fabric[-\s]improvements|insulation|secondary[-\s]glazing|draught[-\s]proofing|airtightness|heat[-\s]loss[-\s]reduction|thermal[-\s]performance|u[-\s]value|building[-\s]performance|energy[-\s]demand[-\s]reduction|retrofit|sensitive[-\s]retrofit|deep[-\s]retrofit|whole[-\s]building[-\s]retrofit",
                        "decarbonisation" : r"decarboni[sz]ation|net[-\s]zero|low[-\s]carbon|zero[-\s]carbon|carbon[-\s]reduction|carbon[-\s]emissions|operational[-\s]carbon|embodied[-\s]carbon|whole[-\s]life[-\s]carbon|carbon[-\s]footprint|carbon[-\s]savings|carbon[-\s]neutral|carbon[-\s]assessment",
@@ -522,6 +512,7 @@ def green_keywords(df): #243 key words/phrases
                        "working from home" : r"home[-\s]office|remote[-\s]working|hybrid[-\s]working|dedicated[-\s]workspace|workspace|home[-\s]working|flexible[-\s]workspace",
                        "energy and comfort" : r"improved[-\s]thermal[-\s]comfort|energy[-\s]efficiency|reduced[-\s]energy[-\s]bills|increased[-\s]comfort|improved[-\s]indoor[-\s]environment|sustainable[-\s]living"}
 
+  df = st.session_state.data_objects[data_object_index].applications
   df["green_keywords"] = [[category for category, pattern in green_terms_table.items() if type(text) == str and re.search(pattern, text, flags = re.IGNORECASE)] for text in df["description"]]
 
 
@@ -539,5 +530,14 @@ def action_code_interpreter(data_object_index, action_details: dict):
                   "replace_int_bound" : bounds_replace,
                   "replace_int_values" : values_replace,
                   "replace_date_bound" : bounds_replace,
-                  "replace_date_values" : values_replace}
+                  "replace_date_values" : values_replace,
+                  "period_date_to_charity" : period_or_date_to_charities,
+                  "climate_change_keywords" : green_keywords}
   action_table[action_details.pop("action_code")](data_object_index, **action_details)
+
+def undo(data_object_index):
+  action_history = st.session_state.data_objects[data_object_index].action_history[:-1]
+  st.session_state.data_objects[data_object_index] = DataObject.from_dataobject(st.session_state.data_objects[data_object_index].name, st.session_state.master_data)
+  for action_details in action_history:
+    action_code_interpreter(data_object_index, action_details)
+  st.toast(body = "Successfully undid the most recent action")

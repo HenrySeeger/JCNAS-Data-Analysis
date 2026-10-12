@@ -116,18 +116,19 @@ with st.expander(label = "Create a Data Object"):
 
 with st.expander(label = "Manage Data Objects"):
   def data_manager_formatting(data):
-    return data if type(data) == str else data.name
-  data_manager_data_object = st.selectbox(label = "Select a data object",
-                                          options = ["No Selection"] + st.session_state.data_objects,
-                                          key = "DataManagerDataObjectSelector",
-                                          format_func = data_manager_formatting,
-                                          disabled = len(st.session_state.data_objects) == 0)
+    return data if type(data) == str else st.session_state.data_objects[data].name
+  data_manager_data_object_index = st.selectbox(label = "Select a data object",
+                                                options = ["No Selection"] + list(range(len(st.session_state.data_objects))),
+                                                key = "DataManagerDataObjectSelector",
+                                                format_func = data_manager_formatting,
+                                                disabled = len(st.session_state.data_objects) == 0)
+  data_manager_data_object = data_manager_data_object_index if type(data_manager_data_object_index) == str else st.session_state.data_objects[data_manager_data_object_index]
   
   data_manager_options = st.selectbox(label = "Manage Options",
-                                      options = ["No Selection", "Delete", "Reset", "Rename", "Period/Date to Charity", "Climate Change Keywords"],
+                                      options = ["No Selection", "Delete", "Reset", "Rename"] + (["Period/Date to Charity"] if type(data_manager_data_object_index) != str and "charities" not in data_manager_data_object.applications.keys() else []) + (["Climate Change Keywords"] if type(data_manager_data_object_index) != str and "green_keywords" not in data_manager_data_object.applications.keys() else []),
                                       key = "DataManagerOptions",
                                       disabled = len(st.session_state.data_objects) == 0 or data_manager_data_object == "No Selection")
-
+  
   if data_manager_data_object != "No Selection":
     match data_manager_options:
       case "Delete":
@@ -135,7 +136,7 @@ with st.expander(label = "Manage Data Objects"):
 
         def delete_data():
           for i, obj in enumerate(st.session_state.data_objects):
-            if obj.name == st.session_state.DataManagerDataObjectSelector.name:
+            if obj.name == data_manager_data_object.name:
               st.session_state.data_objects.pop(i)
               break
 
@@ -150,8 +151,8 @@ with st.expander(label = "Manage Data Objects"):
 
         def reset_data():
           for i, obj in enumerate(st.session_state.data_objects):
-            if obj.name == st.session_state.DataManagerDataObjectSelector.name:
-              st.session_state.data_objects[i] = d.DataObject.from_dataobject(st.session_state.DataManagerDataObjectSelector.name, st.session_state.master_data)
+            if obj.name == data_manager_data_object.name:
+              st.session_state.data_objects[i] = d.DataObject.from_dataobject(data_manager_data_object.name, st.session_state.master_data)
               break
 
           st.session_state.DataManagerDataObjectSelector = "No Selection"
@@ -167,7 +168,7 @@ with st.expander(label = "Manage Data Objects"):
         elif data_new_name_text != "":
           def rename_data(old_name):
             for i in range(len(st.session_state.data_objects)):
-              if old_name == st.session_state.DataManagerDataObjectSelector.name:
+              if old_name == data_manager_data_object.name:
                 st.session_state.data_objects[i].name = st.session_state.DataNewNameText
                 break
             st.toast(f"Renamed '{old_name}' to '{st.session_state.DataNewNameText}'")
@@ -176,22 +177,24 @@ with st.expander(label = "Manage Data Objects"):
           st.button(label = "Rename", on_click = rename_data, args = (data_manager_data_object.name,))
       
       case "Period/Date to Charity":
-        def temp(): #! Rename
-          d.period_or_date_to_charities(st.session_state.DataManagerDataObjectSelector.applications)
-          st.session_state.DataManagerDataObjectSelector.add_action_history("period_date_to_charity", "applications", "period_or_date")
-          st.toast(f"Applied Period/Date -> Charity Algorithm to '{st.session_state.DataManagerDataObjectSelector.name}'")
+        def assign():
+          d.action_code_interpreter(data_manager_data_object_index, {"action_code" : "period_date_to_charity"})
+          # d.period_or_date_to_charities(data_manager_data_object.applications)
+          # data_manager_data_object.add_action_history("period_date_to_charity", "applications", "period_or_date")
+          st.toast(f"Applied Period/Date -> Charity Algorithm to '{data_manager_data_object.name}'")
           st.session_state.DataManagerDataObjectSelector = "No Selection"
           st.session_state.DataManagerOptions = "No Selection"
-        st.button("Assign Charities", on_click = temp)
+        st.button("Assign Charities", on_click = assign)
       
       case "Climate Change Keywords":
-        def temp(): #! Rename
-          d.green_keywords(st.session_state.DataManagerDataObjectSelector.applications)
-          st.session_state.DataManagerDataObjectSelector.add_action_history("climate_change_keywords", "applications", "description")
-          st.toast(f"Detected Climate Change Keywords in '{st.session_state.DataManagerDataObjectSelector.name}'")
+        def assign():
+          d.action_code_interpreter(data_manager_data_object_index, {"action_code" : "climate_change_keywords"})
+          # d.green_keywords(data_manager_data_object.applications)
+          # data_manager_data_object.add_action_history("climate_change_keywords", "applications", "description")
+          st.toast(f"Detected Climate Change Keywords in '{data_manager_data_object.name}'")
           st.session_state.DataManagerDataObjectSelector = "No Selection"
           st.session_state.DataManagerOptions = "No Selection"
-        st.button("Detect Keywords", on_click = temp)
+        st.button("Detect Keywords", on_click = assign)
   else:
     data_manager_options = "No Selection"
 
