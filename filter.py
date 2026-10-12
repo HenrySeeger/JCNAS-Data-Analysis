@@ -432,22 +432,25 @@ with st.expander(label = "Replacing"):
 with st.expander(label = "Merging"):
   st.text("Coming in v2.0")
 
-with st.expander(label = "View Datasets"):
-  def data_viewer_formatting(data):
-    return data if type(data) == str else data["name"]
-  
-  if st.session_state.master_data is not None:
-    data_viewer_selection = st.selectbox(label = "Select a dataset to view",
-                                         options = ["No Selection"] + [data for obj in st.session_state.data_objects + [st.session_state.master_data] for data in [{"name" : f"{obj.name}: applications", "data" : obj.applications}, {"name" : f"{obj.name}: responses", "data" : obj.responses}]],
-                                         format_func = data_viewer_formatting, key = "DataViewerSelecter",
-                                         disabled = st.session_state.applications_entry is None and st.session_state.responses_entry is None)
-    if data_viewer_selection != "No Selection":
-      st.dataframe(data_viewer_selection["data"])
-  else:
-    st.text("Both an applications dataset and a responses dataset are required to be uploaded before any dataset can be viewed")
-
 if action_data_object_index != "Select a Data Object" and len(st.session_state.data_objects[action_data_object_index].action_history):
   with st.expander(label = "View Dataset History", expanded = True):
     if st.button(label = "Undo", disabled = not (action_data_object_index != "Select a Data Object" and len(st.session_state.data_objects[action_data_object_index].action_history))):
       d.undo(action_data_object_index)
+      st.rerun()
+    st.text("Dev purposes, to be removed later:")
     st.text(" - " + str(st.session_state.data_objects[action_data_object_index].action_history)[1:-1].replace("}, ", "\n - ").replace("{", "").replace("}", "").replace("'", ""))
+
+if action_data_object_index != "Select a Data Object":
+  with st.expander(label = "View Datasets"):
+    def data_viewer_formatting(data):
+      return data if type(data) == str else data["name"]
+    
+    if st.session_state.master_data is not None:
+      data_viewer_selection = st.selectbox(label = "Select a dataset to view",
+                                          options = ["No Selection"] + [data for obj in [st.session_state.data_objects[action_data_object_index], st.session_state.master_data] for data in [{"name" : f"{obj.name}: applications", "data" : obj.applications}, {"name" : f"{obj.name}: responses", "data" : obj.responses}]],
+                                          format_func = data_viewer_formatting, key = "DataViewerSelecter",
+                                          disabled = st.session_state.applications_entry is None and st.session_state.responses_entry is None)
+      if data_viewer_selection != "No Selection":
+        st.dataframe(data_viewer_selection["data"])
+    else:
+      st.text("Both an applications dataset and a responses dataset are required to be uploaded before any dataset can be viewed")
