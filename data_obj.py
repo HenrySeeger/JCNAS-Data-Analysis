@@ -32,7 +32,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
   else:
     col1, col2 = st.columns(2)
     with col1:
-      st.text(f"Applications Dataset: {st.session_state.applications_entry.name}")
+      st.markdown(f"<div style='padding-top: 7.5px;'>Applications Dataset: {st.session_state.applications_entry.name}</div>", unsafe_allow_html = True)
     with col2:
       if st.button(label = "Upload New Applications Dataset"):
         st.session_state.applications_entry = None
@@ -47,7 +47,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
   else:
     col1, col2 = st.columns(2)
     with col1:
-      st.text(f"Responses Dataset: {st.session_state.responses_entry.name}")
+      st.markdown(f"<div style='padding-top: 7.5px;'>Responses Dataset: {st.session_state.responses_entry.name}</div>", unsafe_allow_html = True)
     with col2:
       if st.button(label = "Upload New Responses Dataset"):
         st.session_state.responses_entry = None
