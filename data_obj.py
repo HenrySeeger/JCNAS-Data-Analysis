@@ -30,7 +30,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
       master_data_uploaders_on_change()
       st.rerun()
   else:
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([6, 6], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 7.5px;'>Applications Dataset: {st.session_state.applications_entry.name}</div>", unsafe_allow_html = True)
     with col2:
@@ -45,7 +45,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
       master_data_uploaders_on_change()
       st.rerun()
   else:
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([6, 6], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 7.5px;'>Responses Dataset: {st.session_state.responses_entry.name}</div>", unsafe_allow_html = True)
     with col2:
@@ -54,13 +54,26 @@ with st.expander(label = "Upload Datasets", expanded = True):
         master_data_uploaders_on_change()
         st.rerun()
 
+  if "applications_entry" in st.session_state and st.session_state.applications_entry is not None and "responses_entry" in st.session_state and st.session_state.responses_entry is not None:
+    col1, col2 = st.columns([6, 6], gap = None)
+    with col1:
+      def assign():
+        d.period_or_date_to_charities()
+        st.toast(f"Assigned charities to the applications in the master data object based on period/date information")
+      st.button("Assign Charities Based on Period/Date Information", disabled = "charities" in st.session_state.master_data.applications.keys(), on_click = assign)
+    with col2:
+      def assign():
+        d.green_keywords()
+        st.toast(f"Assigned climate change/green keywords to the application in the master data object based on the applications' descriptions")
+      st.button("Assign Climate Change/Green Keywords", disabled = "green_keywords" in st.session_state.master_data.applications.keys(), on_click = assign)
+
 def osbg_letters_to_nums(letters):
   """
   Takes a string of two letters and converts it to positional coordinates based on the British Ordinance Survey National Grid (OSNG)
 
   Args:
     letters (str):
-      Two letters indicating a position in the OSNG (any two letter combintaion, excluding 'I' or 'i').
+      Two letters indicating a position in the OSNG (any two letter combintaion, excluding upper- or lowercase 'i').
       The letters should be capitalized, but the function uses `to_upper()`.
   
   Returns:
@@ -70,7 +83,7 @@ def osbg_letters_to_nums(letters):
   """
   twenty_five_letters = [chr(i) for i in list(range(65, 73)) + list(range(74, 91))] # Removes the letter 'I'
   five_letters = [[char for char in twenty_five_letters[i:5 + i]] for i in range(0, 25, 5)] # Converts list of 25 letters to list of lists of 5 letter pair[[A,B,C,D,E],[F,G,H,J,K],...]
-  letter_coords = [[first + second for first in five_letters[i//5] for second in five_letters[i%5]] for i in range(25)] # Creates full 5x5 matrix of 5x5 sub-matrices (25x25)
+  letter_coords = [[first + second for first in five_letters[i // 5] for second in five_letters[i % 5]] for i in range(25)] # Creates full 5x5 matrix of 5x5 sub-matrices (25x25)
   for i in range(25): # Locates where in the matrix the given letters are located and returns their position relative to the origin 'SV', where up and right are positive directions
     try:
       return letter_coords[i].index(letters) - 10, 19 - i
@@ -103,16 +116,17 @@ with st.expander(label = "Create a Data Object"):
   creation_name_input = st.text_input(label = "Name", key = "DataObjectName", placeholder = "Enter data object name", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None)
   
   # Creates a new DataObject with deep copies of the the master DataObject's datasets if the provided name isn't already being used.
-  # The user is alerted as to the success or failure of creating a new DataObject
   def creation_button_on_click():
     st.session_state.DataObjectName = ""
     if creation_name_input not in [obj.name for obj in st.session_state.data_objects]:
       st.session_state.data_objects.append(d.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
       st.toast(body = f"DataObject '{creation_name_input}' successfully created")
     else:
-      st.toast(body = f"'{creation_name_input}' could not be created because a DataObject with that name already exists")
+      st.toast(body = f"'{creation_name_input}' cannot be created because a DataObject with that name already exists")
 
-  obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or creation_name_input == "", on_click = creation_button_on_click)
+  obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or creation_name_input in [""] + [obj.name for obj in st.session_state.data_objects], on_click = creation_button_on_click)
+  if creation_name_input in [obj.name for obj in st.session_state.data_objects]:
+    st.markdown(f"<div style='padding-bottom: 8px; color: rgb(255, 0, 0);'>Data object '{creation_name_input}' cannot be created because a data object with that name already exists</div>", unsafe_allow_html = True)
 
 with st.expander(label = "Manage Data Objects"):
   def data_manager_formatting(data):
@@ -125,7 +139,7 @@ with st.expander(label = "Manage Data Objects"):
   data_manager_data_object = data_manager_data_object_index if type(data_manager_data_object_index) == str else st.session_state.data_objects[data_manager_data_object_index]
   
   data_manager_options = st.selectbox(label = "Manage Options",
-                                      options = ["No Selection", "Delete", "Reset", "Rename"] + (["Period/Date to Charity"] if type(data_manager_data_object_index) != str and "charities" not in data_manager_data_object.applications.keys() else []) + (["Climate Change Keywords"] if type(data_manager_data_object_index) != str and "green_keywords" not in data_manager_data_object.applications.keys() else []),
+                                      options = ["No Selection", "Delete", "Reset", "Rename"],
                                       key = "DataManagerOptions",
                                       disabled = len(st.session_state.data_objects) == 0 or data_manager_data_object == "No Selection")
   
@@ -175,26 +189,7 @@ with st.expander(label = "Manage Data Objects"):
             st.session_state.DataManagerDataObjectSelector = "No Selection"
             st.session_state.DataManagerOptions = "No Selection"
           st.button(label = "Rename", on_click = rename_data, args = (data_manager_data_object.name,))
-      
-      case "Period/Date to Charity":
-        def assign():
-          d.action_code_interpreter(data_manager_data_object_index, {"action_code" : "period_date_to_charity"})
-          # d.period_or_date_to_charities(data_manager_data_object.applications)
-          # data_manager_data_object.add_action_history("period_date_to_charity", "applications", "period_or_date")
-          st.toast(f"Applied Period/Date -> Charity Algorithm to '{data_manager_data_object.name}'")
-          st.session_state.DataManagerDataObjectSelector = "No Selection"
-          st.session_state.DataManagerOptions = "No Selection"
-        st.button("Assign Charities", on_click = assign)
-      
-      case "Climate Change Keywords":
-        def assign():
-          d.action_code_interpreter(data_manager_data_object_index, {"action_code" : "climate_change_keywords"})
-          # d.green_keywords(data_manager_data_object.applications)
-          # data_manager_data_object.add_action_history("climate_change_keywords", "applications", "description")
-          st.toast(f"Detected Climate Change Keywords in '{data_manager_data_object.name}'")
-          st.session_state.DataManagerDataObjectSelector = "No Selection"
-          st.session_state.DataManagerOptions = "No Selection"
-        st.button("Detect Keywords", on_click = assign)
+
   else:
     data_manager_options = "No Selection"
 
