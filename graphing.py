@@ -11,6 +11,7 @@ import matplotlib.ticker as mticker
 
 st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("x_groups_dict", {})
+st.session_state.setdefault("y_groups_dict", {})
 
 def interpret_colors(colors, desired_num_colors, entry_type):
   if len(colors) == 0:
@@ -41,6 +42,8 @@ def interpret_colors(colors, desired_num_colors, entry_type):
 
 def interpret_ticks(tick_input, entry_type):
   tick_input = [float(tick) for tick in tick_input.replace(" ", "").split(",") if tick != ""][:3]
+  if len(tick_input) == 0:
+    return []
   num_decimals = max([len(str(val)[str(val).index(".") + 1:]) for val in tick_input])
   match entry_type:
     case "Manual":
@@ -50,6 +53,25 @@ def interpret_ticks(tick_input, entry_type):
     case "Log Range":
       return [10**tick for tick in [val / 10**num_decimals for val in range(*[int(val * 10**num_decimals) for val in tick_input])]]
 
+def default_color_selectors(label_name, disabled = False):
+  label_color = "color: #959595;" if disabled else ""
+  st.markdown(f"<div style='padding-left: 15px; {label_color}'>{label_name}:</div>", unsafe_allow_html = True)
+  col1, col2, col3, col4 = st.columns([2.5, 3.25, 1.5, 4.25], gap = None)
+  with col1:
+    st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px; {label_color}'>Color Entry Type:</div>", unsafe_allow_html = True)
+  with col2:
+    new_colors_entry_type = st.selectbox(label = f"{label_name}_new_colors_entry_type", disabled = disabled, label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
+  with col3:
+    st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px; {label_color}'>Colors:</div>", unsafe_allow_html = True)
+  with col4:
+    if new_colors_entry_type == "Single Entry":
+      new_colors = st.color_picker(label = f"{label_name}_New Colors", disabled = disabled, label_visibility = "collapsed", value = None)
+    if new_colors_entry_type == "Multiple Entry":
+      new_colors = st.multiselect(label = f"{label_name}_New Colors", disabled = disabled, label_visibility = "collapsed", options = [], accept_new_options = True)
+    if new_colors_entry_type == "Color Map Entry":
+      new_colors = st.text_input(label = f"{label_name}_New Colors", disabled = disabled, label_visibility = "collapsed", value = "")
+  return (new_colors_entry_type, new_colors)
+
 st.header("Graphing")
 
 #* Select a Graph Type Header
@@ -58,7 +80,7 @@ for i, col in enumerate(st.columns([3, 11], gap = None)):
     if i == 0:
       st.markdown("<div style='padding-top: 5.5px;'>Select a Graph Type:</div>", unsafe_allow_html = True)
     else:
-      st.selectbox(label = "Select graph type", options = ["Select a Graph Type", "Bar Plot", "Pie Chart"], label_visibility = "collapsed", key = "GraphTypeSelect", disabled = len(st.session_state.data_objects) == 0)
+      st.selectbox(label = "Select graph type", options = ["Select a Graph Type", "Bar Plot", "Pie Chart", "Line Chart"], label_visibility = "collapsed", key = "GraphTypeSelect", disabled = len(st.session_state.data_objects) == 0)
 
 "" # Adds a vertical space on the page
 
@@ -89,7 +111,7 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
         for s in sets[1:]:
           rtn = rtn & s
         return rtn
-      x_col_name = st.selectbox(label = "Select a Column", disabled = len(data_object_indices) == 0, options = ["No Variable Selected"] + sorted(intersection([set(st.session_state.data_objects[index].applications.keys()) | set(st.session_state.data_objects[index].responses.keys()) for index in data_object_indices])), label_visibility = "collapsed")
+      x_col_name = st.selectbox(label = "Select a Column", disabled = len(data_object_indices) == 0, options = ["No Variable Selected"] + sorted(intersection([set(st.session_state.data_objects[index].applications.keys()) | set(st.session_state.data_objects[index].responses.keys()) for index in data_object_indices])), key = "x_col_name_select", label_visibility = "collapsed")
       x_col = st.session_state.data_objects[data_object_indices[0]].key_owner(x_col_name)[0][x_col_name] if x_col_name != "No Variable Selected" else ""
 
     #* Variable Grouping
@@ -100,8 +122,8 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
           with col1:
             st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
           with col2:
-            st.selectbox(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = ["No Grouping Selected", "Yearly", "Monthly"], key = "x_groups", accept_new_options = False, label_visibility = "collapsed")
-                                                                                                              #! Add in quarterly option
+            st.selectbox(label = "x_groups", disabled = x_col_name == "No Variable Selected", options = ["No Grouping Selected", "Yearly", "Quarterly", "Monthly"], key = "x_groups", accept_new_options = False, label_visibility = "collapsed")
+
           col1, col2 = st.columns([2, 10], gap = None)
           with col1:
             st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
@@ -114,8 +136,15 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
             match st.session_state.x_groups:
               case "Yearly":
                 current_x_options = range(start_date.year, end_date.year + 1, 1)
-              case "Monthly":
-                current_x_options = [(pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/1"), pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/{pd.Timestamp(f"{start_date.year + (i - 1)//12}/{(i - 1) % 12 + 1}/1").days_in_month}")) for i in range(start_date.month, 13 + max(end_date.year - start_date.year - 1, 0) * 12 + end_date.month)]
+              case "Quarterly":
+                def quarter_num(month):
+                  return (month - 1) // 3 + 1
+                current_x_options = [(pd.Timestamp(f"{start_date.year + i // 4}/{(i % 4) * 3 + 1}/1"), pd.Timestamp(f"{start_date.year + i // 4}/{(i % 4 + 1) * 3}/{pd.Timestamp(f"2000/{(i % 4 + 1) * 3}/1").days_in_month}") + pd.Timedelta(value = 8.64 * 10**13 - 1, unit = "nanoseconds")) for i in range(quarter_num(start_date.month) - 1, (end_date.year - start_date.year) * 4 + quarter_num(end_date.month))]
+                def current_x_group_items_format(dates):
+                  quarter_months_lookup_table = {1 : "Jan-Mar", 2: "Apr-Jun", 3 : "Jul-Sep", 4 : "Oct-Dec"}
+                  return f"{dates[0].year} {quarter_months_lookup_table[dates[1].month / 3]}"
+              case "Monthly":                                                                                                                                                                                                                                # 1 day - 1 nanosecond
+                current_x_options = [(pd.Timestamp(f"{start_date.year + i // 12}/{i % 12 + 1}/1"), pd.Timestamp(f"{start_date.year + i // 12}/{i % 12 + 1}/{pd.Timestamp(f"{start_date.year + i // 12}/{i % 12 + 1}/1").days_in_month}") + pd.Timedelta(value = 8.64 * 10**13 - 1, unit = "nanoseconds")) for i in range(start_date.month - 1, (end_date.year - start_date.year) * 12 + end_date.month)]
                 def current_x_group_items_format(dates):
                   return f"{dates[0].year}-{str(dates[0].month).zfill(2)}"
             st.multiselect(label = "current_x_group_items", disabled = x_col_name == "No Variable Selected" or len(st.session_state.x_groups) == 0, key = "current_x_group_items", options = current_x_options, label_visibility = "collapsed", format_func = current_x_group_items_format)
@@ -179,8 +208,121 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
           print()
         
         case _:
-          st.text(f"Columns with type '{x_col.dtype}' are invalid")
-      st.text(st.session_state.x_groups_dict)
+          st.markdown(f"<div style='color: rgb(255, 0, 0); padding-bottom: 8px;'>Variables with type '{x_col.dtype}' are invalid</div>", unsafe_allow_html = True)
+
+  #* Dependent Variable
+  if st.session_state.GraphTypeSelect in ["Line Chart"]:
+    with st.expander(label = "Dependent Variable"):
+    #* Column Selection
+      col1, col2 = st.columns([3, 9], gap = None)
+      with col1:
+        st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Dependent Variable:</div>", unsafe_allow_html = True)
+      with col2:
+        def intersection(sets):
+          if len(sets) == 0:
+            return {}
+          rtn = set(sets[0])
+          for s in sets[1:]:
+            rtn = rtn & s
+          return rtn
+        y_col_name = st.selectbox(label = "Select a Column", disabled = len(data_object_indices) == 0, options = ["No Variable Selected"] + sorted(intersection([set(st.session_state.data_objects[index].applications.keys()) | set(st.session_state.data_objects[index].responses.keys()) for index in data_object_indices])), key = "y_col_name_select", label_visibility = "collapsed")
+        y_col = st.session_state.data_objects[data_object_indices[0]].key_owner(y_col_name)[0][y_col_name] if y_col_name != "No Variable Selected" else ""
+
+      #* Variable Grouping
+      if y_col_name != "No Variable Selected":
+        match type(y_col.dtype):
+          case np.dtypes.DateTime64DType:
+            col1, col2 = st.columns([1.5, 10.5], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
+            with col2:
+              st.selectbox(label = "y_groups", disabled = y_col_name == "No Variable Selected", options = ["No Grouping Selected", "Yearly", "Quarterly", "Monthly"], key = "y_groups", accept_new_options = False, label_visibility = "collapsed")
+
+            col1, col2 = st.columns([2, 10], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
+            with col2:
+              current_y_options = []
+              start_date = min(y_col)
+              end_date = max(y_col)
+              def current_y_group_items_format(year):
+                return str(year)
+              match st.session_state.y_groups:
+                case "Yearly":
+                  current_y_options = range(start_date.year, end_date.year + 1, 1)
+                case "Quarterly":
+                  def quarter_num(month):
+                    return (month - 1) // 3 + 1
+                  current_y_options = [(pd.Timestamp(f"{start_date.year + i // 4}/{(i % 4) * 3 + 1}/1"), pd.Timestamp(f"{start_date.year + i // 4}/{(i % 4 + 1) * 3}/{pd.Timestamp(f"2000/{(i % 4 + 1) * 3}/1").days_in_month}") + pd.Timedelta(value = 8.64 * 10**13 - 1, unit = "nanoseconds")) for i in range(quarter_num(start_date.month) - 1, (end_date.year - start_date.year) * 4 + quarter_num(end_date.month))]
+                  def current_y_group_items_format(dates):
+                    quarter_months_lookup_table = {1 : "Jan-Mar", 2: "Apr-Jun", 3 : "Jul-Sep", 4 : "Oct-Dec"}
+                    return f"{dates[0].year} {quarter_months_lookup_table[dates[1].month / 3]}"
+                case "Monthly":                                                                                                                                                                                                                                # 1 day - 1 nanosecond
+                  current_y_options = [(pd.Timestamp(f"{start_date.year + i // 12}/{i % 12 + 1}/1"), pd.Timestamp(f"{start_date.year + i // 12}/{i % 12 + 1}/{pd.Timestamp(f"{start_date.year + i // 12}/{i % 12 + 1}/1").days_in_month}") + pd.Timedelta(value = 8.64 * 10**13 - 1, unit = "nanoseconds")) for i in range(start_date.month - 1, (end_date.year - start_date.year) * 12 + end_date.month)]
+                  def current_y_group_items_format(dates):
+                    return f"{dates[0].year}-{str(dates[0].month).zfill(2)}"
+              st.multiselect(label = "current_y_group_items", disabled = y_col_name == "No Variable Selected" or len(st.session_state.y_groups) == 0, key = "current_y_group_items", options = current_y_options, label_visibility = "collapsed", format_func = current_y_group_items_format)
+
+          case pd.StringDtype:
+            col1, col2 = st.columns([1.5, 10.5], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
+            with col2:
+              def y_groups_change():
+                st.session_state.y_groups_dict = {key : st.session_state.y_groups_dict[key] if key in st.session_state.y_groups_dict.keys() else set() for key in st.session_state.y_groups}
+                if st.session_state.current_y_group not in st.session_state.y_groups_dict:
+                  st.session_state.current_y_group = None
+              st.multiselect(label = "y_groups", disabled = y_col_name == "No Variable Selected", options = None, key = "y_groups", accept_new_options = True, label_visibility = "collapsed", on_change = y_groups_change)
+
+            col1, col2 = st.columns([2.25, 9.75], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Current Group:</div>", unsafe_allow_html = True)
+            with col2:
+              def current_y_group_change():
+                st.session_state.current_y_group_items = st.session_state.y_groups_dict[st.session_state.current_y_group]
+              st.selectbox(label = "current_y_group", disabled = y_col_name == "No Variable Selected" or len(st.session_state.y_groups) == 0, key = "current_y_group", options = st.session_state.y_groups, index = None, accept_new_options = y_col_name != "No Variable Selected", label_visibility = "collapsed", on_change = current_y_group_change)
+
+            col1, col2 = st.columns([2, 10], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
+            with col2:
+              def current_y_group_items_change():
+                if st.session_state.current_y_group in st.session_state.y_groups_dict.keys():
+                  st.session_state.y_groups_dict[st.session_state.current_y_group] = set(st.session_state.current_y_group_items)
+                else:
+                  st.session_state.current_y_group_items = []
+              unique_y_col = list(y_col.unique())
+              unique_y_col.remove(np.nan)
+              st.multiselect(label = "current_y_group_items", disabled = y_col_name == "No Variable Selected" or len(st.session_state.y_groups) == 0, key = "current_y_group_items", options = unique_y_col if len(unique_y_col) <= 25 else [], accept_new_options = y_col_name != "No Variable Selected" and len(unique_y_col) > 25, label_visibility = "collapsed", on_change = current_y_group_items_change)
+          
+          case np.dtypes.ObjectDType:
+            col1, col2 = st.columns([1.5, 10.5], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Groups:</div>", unsafe_allow_html = True)
+            with col2:
+              def y_groups_change():
+                st.session_state.y_groups_dict = {key : st.session_state.y_groups_dict[key] if key in st.session_state.y_groups_dict.keys() else set() for key in st.session_state.y_groups}
+              st.multiselect(label = "y_groups", disabled = y_col_name == "No Variable Selected", options = None, key = "y_groups", accept_new_options = True, label_visibility = "collapsed", on_change = y_groups_change)
+
+            col1, col2 = st.columns([2.25, 9.75], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Current Group:</div>", unsafe_allow_html = True)
+            with col2:
+              def current_y_group_change():
+                st.session_state.current_y_group_items = st.session_state.y_groups_dict[st.session_state.current_y_group]
+              st.selectbox(label = "current_y_group", disabled = y_col_name == "No Variable Selected" or len(st.session_state.y_groups) == 0, key = "current_y_group", options = st.session_state.y_groups, label_visibility = "collapsed", on_change = current_y_group_change)
+
+            col1, col2 = st.columns([2, 10], gap = None)
+            with col1:
+              st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Group Items:</div>", unsafe_allow_html = True)
+            with col2:
+              def current_y_group_items_change():
+                st.session_state.y_groups_dict[st.session_state.current_y_group] = set(st.session_state.current_y_group_items)
+              st.multiselect(label = "current_y_group_items", disabled = y_col_name == "No Variable Selected" or len(st.session_state.y_groups) == 0, key = "current_y_group_items", options = sorted(set(val for val_list in y_col for val in val_list)) if y_col_name != "No Variable Selected" else [], label_visibility = "collapsed", on_change = current_y_group_items_change)
+            print()
+          
+          case _:
+            st.markdown(f"<div style='color: rgb(255, 0, 0); padding-bottom: 8px;'>Variables with type '{y_col.dtype}' are invalid</div>", unsafe_allow_html = True)
 
   #* Figure Layout
   with st.expander(label = "Figure Layout"):
@@ -329,6 +471,39 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
     with col4:
       legend_ypos = st.number_input(label = "legend ypos", value = None, step = 0.01, disabled = not show_legend, label_visibility = "collapsed")
 
+    #* Legend Background Colors
+    st.markdown(f"<div style='padding-left: 15px;'>Legend Background:</div>", unsafe_allow_html = True)
+    col1, col2, col3, col4 = st.columns([2.5, 3.25, 1.5, 4.25], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Color Entry Type:</div>", unsafe_allow_html = True)
+    with col2:
+      legend_background_colors_entry_type = st.selectbox(label = f"legend background_legend_background_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Manual Single Entry"])
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Colors:</div>", unsafe_allow_html = True)
+    with col4:
+      if legend_background_colors_entry_type == "Single Entry":
+        legend_background_colors = st.color_picker(label = f"Legend Background New Colors", label_visibility = "collapsed", value = "#ffffff")
+      if legend_background_colors_entry_type == "Manual Single Entry":
+        legend_background_colors = st.multiselect(label = f"Legend Background New Colors", label_visibility = "collapsed", options = None, accept_new_options = True)
+
+    #* Legend Edge Colors
+    st.markdown(f"<div style='padding-left: 15px;'>Legend Edge:</div>", unsafe_allow_html = True)
+    col1, col2, col3, col4 = st.columns([2.5, 3.25, 1.5, 4.25], gap = None)
+    with col1:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Color Entry Type:</div>", unsafe_allow_html = True)
+    with col2:
+      legend_edge_colors_entry_type = st.selectbox(label = f"legend_edge_legend_edge_colors_entry_type", label_visibility = "collapsed", options = ["Single Entry", "Manual Single Entry"])
+    with col3:
+      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Colors:</div>", unsafe_allow_html = True)
+    with col4:
+      if legend_edge_colors_entry_type == "Single Entry":
+        legend_edge_colors = st.color_picker(label = f"Legend Edge New Colors", label_visibility = "collapsed", value = "#BEBEBE")
+      if legend_edge_colors_entry_type == "Manual Single Entry":
+        legend_edge_colors = st.multiselect(label = f"Legend Edge New Colors", label_visibility = "collapsed", options = None, accept_new_options = True)
+
+    # #* Legend Edge Colors
+    # legend_edge_colors_entry_type, legend_edge_colors = default_color_selectors("Legend Edge")
+
     #* New Labels Toggle
     col1, col2 = st.columns([3, 9], gap = None)
     with col1:
@@ -345,55 +520,16 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
       legend_new_labels = st.multiselect(label = "legend new labels", disabled = not (show_legend and manual_legend_entry_toggle), options = None, accept_new_options = True, label_visibility = "collapsed")
 
     #* Optional Different Legend Colors
-    col1, col2, col3, col4 = st.columns([3.5, 3, 1.75, 3.75], gap = None)
-    with col1:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px; {manual_legend_parameters_label_color};'>Manual Color Entry Type:</div>", unsafe_allow_html = True)
-    with col2:
-      legend_new_colors_entry_type = st.selectbox(label = "legend_new_colors_entry_type", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
-    with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px; {manual_legend_parameters_label_color}'>Fill Colors:</div>", unsafe_allow_html = True)
-    with col4:
-      if legend_new_colors_entry_type == "Single Entry":
-        legend_new_colors = st.color_picker(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", value = None)
-      if legend_new_colors_entry_type == "Multiple Entry":
-        legend_new_colors = st.multiselect(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", options = [], accept_new_options = True)
-      if legend_new_colors_entry_type == "Color Map Entry":
-        legend_new_colors = st.text_input(label = "Legend New Colors", disabled = not (show_legend and manual_legend_entry_toggle), label_visibility = "collapsed", value = "")
-
+    legend_new_colors_entry_type, legend_new_colors = default_color_selectors("New Legend Colors", disabled = not (show_legend and manual_legend_entry_toggle))
+    
 #* Bar Plot Specific  
 if st.session_state.GraphTypeSelect  == "Bar Plot":
   with st.expander(label = "Bar Plot Specific"):
     #* Bar Fill Color
-    col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
-    with col1:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Entry Type:</div>", unsafe_allow_html = True)
-    with col2:
-      bar_fill_colors_entry_type = st.selectbox(label = "bar__fill_colors_entry_type", label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
-    with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Colors:</div>", unsafe_allow_html = True)
-    with col4:
-      if bar_fill_colors_entry_type == "Multiple Entry":
-        bar_fill_colors = st.multiselect(label = "Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
-      if bar_fill_colors_entry_type == "Single Entry":
-        bar_fill_colors = st.color_picker(label = "Fill Colors", label_visibility = "collapsed", value = None)
-      if bar_fill_colors_entry_type == "Color Map Entry":
-        bar_fill_colors = st.text_input(label = "Fill Colors", label_visibility = "collapsed", value = "")
+    bar_fill_colors_entry_type, bar_fill_colors = default_color_selectors("Bar Fill Colors")
 
     #* Bar Edge Color
-    col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
-    with col1:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Entry Type:</div>", unsafe_allow_html = True)
-    with col2:
-      bar_edge_colors_entry_type = st.selectbox(label = "bar_edge_colors_entry_type", label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
-    with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Edge Colors:</div>", unsafe_allow_html = True)
-    with col4:
-      if bar_edge_colors_entry_type == "Multiple Entry":
-        bar_edge_colors = st.multiselect(label = "Edge Colors", label_visibility = "collapsed", options = [], placeholder = "None", accept_new_options = True)
-      if bar_edge_colors_entry_type == "Single Entry":
-        bar_edge_colors = st.color_picker(label = "Edge Colors", label_visibility = "collapsed", value = None)
-      if bar_edge_colors_entry_type == "Color Map Entry":
-        bar_edge_colors = st.text_input(label = "Edge Colors", label_visibility = "collapsed", value = "", placeholder = "None")
+    bar_edge_colors_entry_type, bar_edge_colors = default_color_selectors("Bar Edge Colors")
 
    #* Bar Width and Tick Marks
     col1, col2, col3, col4 = st.columns([2, 2.25, 1.75, 6], gap = None)
@@ -410,20 +546,7 @@ if st.session_state.GraphTypeSelect  == "Bar Plot":
 if st.session_state.GraphTypeSelect == "Pie Chart":
   with st.expander(label = "Pie Chart Specific"):
     #* Wedge Fill Color
-    col1, col2, col3, col4 = st.columns([2.5, 3.5, 2, 4], gap = None)
-    with col1:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Color Entry Type:</div>", unsafe_allow_html = True)
-    with col2:
-      wedge_fill_colors_entry_type = st.selectbox(label = "wedge_fill_colors_entry_type", label_visibility = "collapsed", options = ["Multiple Entry", "Single Entry", "Color Map Entry"])
-    with col3:
-      st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Fill Colors:</div>", unsafe_allow_html = True)
-    with col4:
-      if wedge_fill_colors_entry_type == "Multiple Entry":
-        wedge_fill_colors = st.multiselect(label = "Wedge Fill Colors", label_visibility = "collapsed", options = [], accept_new_options = True)
-      if wedge_fill_colors_entry_type == "Single Entry":
-        wedge_fill_colors = st.color_picker(label = "Wedge Fill Colors", label_visibility = "collapsed", value = None)
-      if wedge_fill_colors_entry_type == "Color Map Entry":
-        wedge_fill_colors = st.text_input(label = "Wedge Fill Colors", label_visibility = "collapsed", value = "")
+    wedge_fill_colors_entry_type, wedge_fill_colors = default_color_selectors("Wedge Fill Colors")
 
     #* Rotation (Direction and Starting Position)
     col1, col2, col3, col4 = st.columns([1.5, 4.5, 2.5, 3.5], gap = None)
@@ -512,7 +635,7 @@ with col1:
 with col3:
   st.markdown(f"<div style='padding-top: 9.5px; text-align: left; padding-left: 0px;{"" if st.session_state.automatically_update_graph_toggle else " color: rgb(100, 100, 100);"})'>Automatically Update Graph</div>", unsafe_allow_html = True)
 
-if (st.session_state.automatically_update_graph_toggle or st.session_state.manualluy_update_graph) and st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "No Variable Selected" and (len([i2 for i in st.session_state.x_groups_dict.values() for i2 in i if i2 != ""]) > 0 or (x_col.dtype == np.dtype("datetime64[us]") and len(st.session_state.current_x_group_items) > 0)): #! Make sure to include conditional len(y_groups)
+if (st.session_state.automatically_update_graph_toggle or st.session_state.manually_update_graph) and st.session_state.GraphTypeSelect != "Select a Graph Type" and x_col_name != "No Variable Selected" and (len([i2 for i in st.session_state.x_groups_dict.values() for i2 in i if i2 != ""]) > 0 or (x_col.dtype == np.dtype("datetime64[us]") and len(st.session_state.current_x_group_items) > 0)): #! Make sure to include conditional len(y_groups)
   fig, ax = plt.subplots(1, 1, figsize = (figure_width, figure_height))
 
   ax.set_title(label = textwrap.fill(figure_title, width = max(len(figure_title), 1) if figure_title_width == None else figure_title_width))
@@ -529,21 +652,22 @@ if (st.session_state.automatically_update_graph_toggle or st.session_state.manua
             bar_kwargs["height"] = [len([col for col in x_col if type(col) != float and re.search("|".join(group), col, flags = re.IGNORECASE)]) if len(group) > 0 else 0 for group in st.session_state.x_groups_dict.values()]
             bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
           case np.dtypes.DateTime64DType:
-            start_date = min(x_col)
-            end_date = max(x_col)
             match st.session_state.x_groups:
               case "Yearly":
-                bar_kwargs["height"] = [sum((pd.Timestamp(f"{year}/01/01") <= x_col) & (x_col <= pd.Timestamp(f"{year}/12/31"))) for year in st.session_state.current_x_group_items]
+                bar_kwargs["height"] = [sum((pd.Timestamp(f"{year}/1/1") <= x_col) & (x_col < pd.Timestamp(f"{year + 1}/1/1"))) for year in st.session_state.current_x_group_items]
                 bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
                 bar_kwargs["label"] = st.session_state.current_x_group_items
-                bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, end_date.year - start_date.year + 1, bar_fill_colors_entry_type)
-                bar_kwargs["edgecolor"] = interpret_colors(bar_edge_colors, end_date.year - start_date.year + 1, bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None
+              case "Quarterly":
+                bar_kwargs["height"] = [sum((bounds[0] <= x_col) & (x_col <= bounds[1])) for bounds in st.session_state.current_x_group_items]
+                bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
+                quarter_months_lookup_table = {1 : "Jan-Mar", 2: "Apr-Jun", 3 : "Jul-Sep", 4 : "Oct-Dec"}
+                bar_kwargs["label"] = [f"{dates[0].year} {quarter_months_lookup_table[dates[1].month / 3]}" for dates in st.session_state.current_x_group_items]
               case "Monthly":
                 bar_kwargs["height"] = [sum((bounds[0] <= x_col) & (x_col <= bounds[1])) for bounds in st.session_state.current_x_group_items]
                 bar_kwargs["x"] = [float(tick) for tick in bar_tick_marks.replace(" ", "").split(",")] if bar_tick_marks != "" and len(bar_tick_marks.replace(" ", "").split(",")) == len(bar_kwargs["height"]) else range(len(bar_kwargs["height"]))
                 bar_kwargs["label"] = [f"{dates[0].year}-{str(dates[0].month).zfill(2)}" for dates in st.session_state.current_x_group_items]
-                bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, len(st.session_state.current_x_group_items), bar_fill_colors_entry_type)
-                bar_kwargs["edgecolor"] = interpret_colors(bar_edge_colors, len(st.session_state.current_x_group_items), bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None
+            bar_kwargs["facecolor"] = interpret_colors(bar_fill_colors, len(st.session_state.current_x_group_items), bar_fill_colors_entry_type)
+            bar_kwargs["edgecolor"] = interpret_colors(bar_edge_colors, len(st.session_state.current_x_group_items), bar_edge_colors_entry_type) if len(bar_edge_colors) > 0 else None
         return bar_kwargs
       
       ax.bar(**bar_group_sizes(), width = bar_width, log = False)
@@ -559,17 +683,18 @@ if (st.session_state.automatically_update_graph_toggle or st.session_state.manua
             wedge_kwargs["x"] = [len([col for col in x_col if type(col) != float and re.search("|".join(group), col, flags = re.IGNORECASE)]) if len(group) > 0 else 0 for group in st.session_state.x_groups_dict.values()]
             wedge_kwargs["labels"] = [f"{name}{"\n" if pie_percent_label or pie_number_label else ""}{f"{wedge_kwargs["x"][i] / sum(wedge_kwargs["x"]) * 100:.1f}" + "%" if pie_percent_label else ""}{" " if pie_percent_label and pie_number_label else ""}{"(" + f"{wedge_kwargs["x"][i]:,}" + ")" if pie_number_label else ""}" for i, name in enumerate(st.session_state.x_groups_dict.keys())]
           case np.dtypes.DateTime64DType:
-            start_date = min(x_col)
-            end_date = max(x_col)
             match st.session_state.x_groups:
               case "Yearly":
-                wedge_kwargs["x"] = [sum((pd.Timestamp(f"{year}/01/01") <= x_col) & (x_col <= pd.Timestamp(f"{year}/12/31"))) for year in st.session_state.current_x_group_items]
+                wedge_kwargs["x"] = [sum((pd.Timestamp(f"{year}/1/1") <= x_col) & (x_col < pd.Timestamp(f"{year + 1}/1/1"))) for year in st.session_state.current_x_group_items]
                 wedge_kwargs["labels"] = [f"{year}{"\n" if pie_percent_label or pie_number_label else ""}{f"{wedge_kwargs["x"][i] / sum(wedge_kwargs["x"]) * 100:.1f}" + "%" if pie_percent_label else ""}{" " if pie_percent_label and pie_number_label else ""}{"(" + f"{wedge_kwargs["x"][i]:,}" + ")" if pie_number_label else ""}" for i, year in enumerate(st.session_state.current_x_group_items)]
-                wedge_kwargs["colors"] = interpret_colors(wedge_fill_colors, end_date.year - start_date.year + 1, wedge_fill_colors_entry_type)
-              case "Monthly":
+              case "Quarterly": #! Add percent and number
+                wedge_kwargs["x"] = [sum((bounds[0] <= x_col) & (x_col <= bounds[1])) for bounds in st.session_state.current_x_group_items]
+                quarter_months_lookup_table = {1 : "Jan-Mar", 2: "Apr-Jun", 3 : "Jul-Sep", 4 : "Oct-Dec"}
+                wedge_kwargs["labels"] = [f"{dates[0].year} {quarter_months_lookup_table[dates[1].month / 3]}" for dates in st.session_state.current_x_group_items]
+              case "Monthly": #! Add percent and number
                 wedge_kwargs["x"] = [sum((bounds[0] <= x_col) & (x_col <= bounds[1])) for bounds in st.session_state.current_x_group_items]
                 wedge_kwargs["labels"] = [f"{dates[0].year}-{str(dates[0].month).zfill(2)}" for dates in st.session_state.current_x_group_items]
-                wedge_kwargs["colors"] = interpret_colors(wedge_fill_colors, len(st.session_state.current_x_group_items), wedge_fill_colors_entry_type)
+            wedge_kwargs["colors"] = interpret_colors(wedge_fill_colors, len(st.session_state.current_x_group_items), wedge_fill_colors_entry_type)
         return wedge_kwargs
 
       ax.pie(**wedge_group_sizes(), wedgeprops = {"width" : wedge_width}, textprops = {"fontsize" : pie_label_font_size}, startangle = wedge_starting_angle, counterclock = pie_rotation == "Counterclockwise")
@@ -601,6 +726,16 @@ if (st.session_state.automatically_update_graph_toggle or st.session_state.manua
 
   if show_legend:
     legend_kwargs = {}
+
+    if legend_background_colors not in [None, []]:
+      legend_kwargs["facecolor"] = interpret_colors(legend_background_colors, 1, legend_background_colors_entry_type)[0]
+      if len(legend_kwargs["facecolor"]) == 4 and legend_kwargs["facecolor"][3] == 0:
+        legend_kwargs["facecolor"] = "none"
+
+    if legend_edge_colors not in [None, []]:
+      legend_kwargs["edgecolor"] = interpret_colors(legend_edge_colors, 1, legend_edge_colors_entry_type)[0]
+      if len(legend_kwargs["edgecolor"]) == 4 and legend_kwargs["edgecolor"][3] == 0:
+        legend_kwargs["edgecolor"] = "none"
 
     if legend_xpos != None and legend_ypos != None:
       legend_kwargs["bbox_to_anchor"] = (legend_xpos, legend_ypos)

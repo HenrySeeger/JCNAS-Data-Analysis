@@ -53,7 +53,7 @@ with st.expander(label = "Upload Datasets", expanded = True):
         st.session_state.responses_entry = None
         master_data_uploaders_on_change()
         st.rerun()
-
+  "" # Adds a vertical space on the page
   if "applications_entry" in st.session_state and st.session_state.applications_entry is not None and "responses_entry" in st.session_state and st.session_state.responses_entry is not None:
     col1, col2 = st.columns([6, 6], gap = None)
     with col1:
@@ -118,12 +118,9 @@ with st.expander(label = "Create a Data Object"):
   # Creates a new DataObject with deep copies of the the master DataObject's datasets if the provided name isn't already being used.
   def creation_button_on_click():
     st.session_state.DataObjectName = ""
-    if creation_name_input not in [obj.name for obj in st.session_state.data_objects]:
-      st.session_state.data_objects.append(d.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
-      st.toast(body = f"DataObject '{creation_name_input}' successfully created")
-    else:
-      st.toast(body = f"'{creation_name_input}' cannot be created because a DataObject with that name already exists")
-
+    st.session_state.data_objects.append(d.DataObject.from_dataobject(creation_name_input, st.session_state.master_data))
+    st.toast(body = f"DataObject '{creation_name_input}' successfully created")
+    
   obj_creation_button = st.button(label = "Create Object", disabled = st.session_state.applications_entry is None or st.session_state.responses_entry is None or creation_name_input in [""] + [obj.name for obj in st.session_state.data_objects], on_click = creation_button_on_click)
   if creation_name_input in [obj.name for obj in st.session_state.data_objects]:
     st.markdown(f"<div style='padding-bottom: 8px; color: rgb(255, 0, 0);'>Data object '{creation_name_input}' cannot be created because a data object with that name already exists</div>", unsafe_allow_html = True)
