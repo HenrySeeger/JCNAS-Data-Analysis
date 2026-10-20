@@ -23,23 +23,24 @@ with col2:
   action_data_object_index = st.selectbox(label = "Select a Data Object", options = ["Select a Data Object"] + list(range(len(st.session_state.data_objects))), key = "ActionDataObject", format_func = clean_select_format, label_visibility = "collapsed")
 
 #* Cleaning Section
-with st.expander(label = "Cleaning"):
+with st.expander(label = "Cleaning and Filtering"):
   #* Data Object Column Selector
   col1, col2, col3 = st.columns([2.62, 6.74, 1.64])
   with col1:
     st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Select a Column:</div>", unsafe_allow_html = True)
   with col2:
     options = ["Select a Column"] + ([] if action_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[action_data_object_index].applications.keys()) + list(st.session_state.data_objects[action_data_object_index].responses.keys()))))
-    cleaning_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "CleaningColumn", disabled = action_data_object_index == "Select a Data Object")
+    cleaning_col_name = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "CleaningColumn", disabled = action_data_object_index == "Select a Data Object")
+    cleaning_col = st.session_state.data_objects[action_data_object_index].key_owner(cleaning_col_name)[0][cleaning_col_name] if cleaning_col_name != "Select a Column" else ""
   
-  if cleaning_col != "Select a Column":
+  if cleaning_col_name != "Select a Column":
     tab_duplicates, tab_filter, tab_remove_col = st.tabs(["Remove Duplicates", "Filter Entries", "Remove a Column"])
 
     #* Remove Duplicates
     with tab_duplicates:
 
       def remove_duplicates():
-        d.action_code_interpreter(action_data_object_index, {"action_code" : "drop_duplicates","column" : cleaning_col})
+        d.action_code_interpreter(action_data_object_index, {"action_code" : "drop_duplicates","column" : cleaning_col_name})
         st.session_state.CleaningColumn = "Select a Column"
         st.toast(body = f"Successfully removed duplicate values")
       st.button(label = "Remove Duplicates", on_click = remove_duplicates)
@@ -47,7 +48,7 @@ with st.expander(label = "Cleaning"):
     #* Filter Values
     with tab_filter:
       #* Inclusion/Exclusion & None Inclusion toggles
-      if cleaning_col not in [None, "Select a Column"]:
+      if cleaning_col_name not in [None, "Select a Column"]:
         for i, col in enumerate(st.columns([1, 6.5, 1, 9.5], gap = "xxsmall", border = False)):
           with col:
             if i == 0:
@@ -65,10 +66,9 @@ with st.expander(label = "Cleaning"):
         filter_function_kwargs = None
 
         #* Variable Type Selection filt
-        match type(st.session_state.data_objects[action_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]):
+        match type(st.session_state.data_objects[action_data_object_index].key_owner(cleaning_col_name)[0].dtypes[cleaning_col_name]):
           #* String Variable Type
-          case pd.StringDtype | np.dtypes.ObjectDType:
-            is_str = type(st.session_state.data_objects[action_data_object_index].key_owner(cleaning_col)[0].dtypes[cleaning_col]) == pd.StringDtype
+          case pd.StringDtype:
             for i, col in enumerate(st.columns([1, 6.5, 1, 5, 1, 3.5], gap = "xxsmall", border = False)):
               with col:
                 if i == 0:
@@ -85,11 +85,14 @@ with st.expander(label = "Cleaning"):
                   st.markdown(f"<div style='padding-top: 9.5px;'>{"Or" if st.session_state.FilterOrGateToggle else "And"}-Gate</div>", unsafe_allow_html = True)
 
             standard_filters_table = {"description" : []}
+            options = list(cleaning_col.unique())
+            if np.nan in options:
+              options.remove(np.nan)
 
-            string_selections = st.multiselect(label = "List Text:", options = standard_filters_table[cleaning_col] if cleaning_col in standard_filters_table.keys() else None, accept_new_options = True, key = "FilterStringSelections")
+            string_selections = st.multiselect(label = "List Text:", options = standard_filters_table[cleaning_col_name] if cleaning_col_name in standard_filters_table.keys() else (options if len(options) <= 30 else None), accept_new_options = len(options) > 30, key = "FilterStringSelections")
 
-            filter_function_kwargs = {"action_code" : "filter_string" if is_str else "filter_list_string",
-                                      "column" : cleaning_col,
+            filter_function_kwargs = {"action_code" : "filter_string",
+                                      "column" : cleaning_col_name,
                                       "include_values" : st.session_state.FilterInclusionToggle,
                                       "remove_none" : st.session_state.FilterNoneToggle,
                                       "string_values" : string_selections,
@@ -99,6 +102,28 @@ with st.expander(label = "Cleaning"):
             def filter():
               d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
               st.session_state.FilterStringSelections = []
+              st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
+            st.button(label = "Filter", on_click = filter)
+          
+          #* List Variable Type
+          case np.dtypes.ObjectDType:
+            col1, col2 = st.columns([1, 11], gap = "xxsmall", border = False)
+            with col1:
+              st.toggle(label = "OrGating", key = "FilterOrGateToggle", value = True, label_visibility = "collapsed")
+            with col2:
+              st.markdown(f"<div style='padding-top: 9.5px;'>{"Or" if st.session_state.FilterOrGateToggle else "And"}-Gate</div>", unsafe_allow_html = True)
+
+            list_selections = st.multiselect(label = "List Text:", options = sorted(set(val for val_list in cleaning_col for val in val_list)), accept_new_options = False, key = "FilterListSelections")
+
+            filter_function_kwargs = {"action_code" : "filter_list_string",
+                                      "column" : cleaning_col_name,
+                                      "include_values" : st.session_state.FilterInclusionToggle,
+                                      "remove_none" : st.session_state.FilterNoneToggle,
+                                      "list_values" : list_selections,
+                                      "or_gate" : st.session_state.FilterOrGateToggle}
+            def filter():
+              d.action_code_interpreter(action_data_object_index, filter_function_kwargs)
+              st.session_state.FilterListSelections = []
               st.toast(body = f"'{st.session_state.data_objects[action_data_object_index].name}' successfully filtered")
             st.button(label = "Filter", on_click = filter)
 
@@ -124,7 +149,7 @@ with st.expander(label = "Cleaning"):
                                               # trying to filter without selected values (None-values included)                                            trying to filter with a lower_bound greater than the upper bound
               disable_filter_button = (int_lower_bound is None and int_upper_bound is None and not st.session_state.FilterNoneToggle) or (int_lower_bound is not None and int_upper_bound is not None and int_lower_bound > int_upper_bound)
               filter_function_kwargs = {"action_code" : "filter_int_bound",
-                                        "column" : cleaning_col,
+                                        "column" : cleaning_col_name,
                                         "include_values" : st.session_state.FilterInclusionToggle,
                                         "remove_none" : st.session_state.FilterNoneToggle,
                                         "int_lower_bound" : int_lower_bound,
@@ -145,8 +170,8 @@ with st.expander(label = "Cleaning"):
                                      # trying to filter without selected values (None-values included)                
                 disable_filter_button = int_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function_kwargs = {"action_code" : "filter_int_values",
-                                          "dataset" : st.session_state.data_objects[action_data_object_index].key_owner_name(cleaning_col),
-                                          "column" : cleaning_col,
+                                          "dataset" : st.session_state.data_objects[action_data_object_index].key_owner_name(cleaning_col_name),
+                                          "column" : cleaning_col_name,
                                           "include_values" : st.session_state.FilterInclusionToggle,
                                           "remove_none" : st.session_state.FilterNoneToggle,
                                           "int_values" : [int(num) for num in int_selections]}
@@ -185,7 +210,7 @@ with st.expander(label = "Cleaning"):
                       #                             trying to filter without selected values (None-values included)                                           trying to filter with an earlier date later than the later date
               disable_filter_button = (date_earlier_bound is None and date_later_bound is None and not st.session_state.FilterNoneToggle) or (date_earlier_bound is not None and date_later_bound is not None and date_earlier_bound > date_later_bound)
               filter_function_kwargs = {"action_code" : "filter_date_bound",
-                                        "column" : cleaning_col,
+                                        "column" : cleaning_col_name,
                                         "include_values" : st.session_state.FilterInclusionToggle,
                                         "remove_none" : st.session_state.FilterNoneToggle,
                                         "date_earlier_bound" : date_earlier_bound,
@@ -208,7 +233,7 @@ with st.expander(label = "Cleaning"):
                     raise()
                 disable_filter_button = date_selections == [] and not st.session_state.FilterNoneToggle
                 filter_function_kwargs = {"action_code" : "filter_date_values",
-                                          "column" : cleaning_col,
+                                          "column" : cleaning_col_name,
                                           "include_values" : st.session_state.FilterInclusionToggle,
                                           "remove_none" : st.session_state.FilterNoneToggle,
                                           "date_values" : [pd.Timestamp(date) for date in date_selections]}
@@ -224,13 +249,13 @@ with st.expander(label = "Cleaning"):
 
     #* Delete a Column
     with tab_remove_col:
-      data_delete_confirmation = st.toggle(label = f"Confirm removal of {cleaning_col}", value = False)
+      data_delete_confirmation = st.toggle(label = f"Confirm removal of {cleaning_col_name}", value = False)
 
       def remove_column():
-        d.action_code_interpreter(action_data_object_index, {"action_code" : "deletion","column" : cleaning_col})
+        d.action_code_interpreter(action_data_object_index, {"action_code" : "deletion","column" : cleaning_col_name})
         st.session_state.CleaningColumn = "Select a Column"
-        st.toast(body = f"Successfully removed '{cleaning_col}' from '{st.session_state.data_objects[action_data_object_index].name}'")
-      st.button(label = f"Remove '{cleaning_col}' from '{st.session_state.data_objects[action_data_object_index].name}'", disabled = not data_delete_confirmation, on_click = remove_column)
+        st.toast(body = f"Successfully removed '{cleaning_col_name}' from '{st.session_state.data_objects[action_data_object_index].name}'")
+      st.button(label = f"Remove '{cleaning_col_name}' from '{st.session_state.data_objects[action_data_object_index].name}'", disabled = not data_delete_confirmation, on_click = remove_column)
 
 #* Replacement Section
 with st.expander(label = "Replacing"):
@@ -285,7 +310,7 @@ with st.expander(label = "Replacing"):
           st.session_state.ReplaceStringSelectionsTarget = []
           st.session_state.ReplaceStringSelectionsNew = []
           st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
-        st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
+        st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
 
       #* Integer Variable Type
       case np.dtypes.Int64DType:
@@ -324,7 +349,7 @@ with st.expander(label = "Replacing"):
             st.session_state.ReplaceIntUpperBound = None
             st.session_state.ReplaceIntBoundNew = None
             st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
-          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
+          st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
 
         #* List of Integers
         elif replace_int_tabs == "Individual Values":
@@ -356,7 +381,7 @@ with st.expander(label = "Replacing"):
             st.session_state.ReplaceIntSelectionsTarget = []
             st.session_state.ReplaceIntSelectionsNew = []
             st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
-          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
+          st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
 
       #* DateTime Variable Type
       case np.dtypes.DateTime64DType:
@@ -396,7 +421,7 @@ with st.expander(label = "Replacing"):
             st.session_state.ReplaceDateLaterBound = None
             st.session_state.ReplaceDateBoundNew = None
             st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}' ")
-          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
+          st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
 
       #* List of Dates
         elif date_tabs == "Individual Dates":
@@ -428,7 +453,7 @@ with st.expander(label = "Replacing"):
             st.session_state.ReplaceDateAreaTarget = []
             st.session_state.ReplaceDateAreaNew = []
             st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
-          st.button(label = "Filter", disabled = disable_replace_button, on_click = replace)
+          st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
 
 with st.expander(label = "Merging"):
   st.text("Coming in v2.0")
@@ -441,17 +466,17 @@ if action_data_object_index != "Select a Data Object" and len(st.session_state.d
     st.text("Dev purposes, to be removed later:")
     st.text(" - " + str(st.session_state.data_objects[action_data_object_index].action_history)[1:-1].replace("}, ", "\n - ").replace("{", "").replace("}", "").replace("'", ""))
 
-if action_data_object_index != "Select a Data Object":
-  with st.expander(label = "View Datasets"):
-    def data_viewer_formatting(data):
-      return data if type(data) == str else data["name"]
+with st.expander(label = "View Datasets"):
+  def data_viewer_formatting(data):
+    return data if type(data) == str else data["name"]
+  
+  if st.session_state.master_data is not None:
+    data_viewer_selection = st.selectbox(label = "Select a dataset to view",
+                                        options = ["No Selection"] + [data for obj in ([st.session_state.data_objects[action_data_object_index]] if action_data_object_index != "Select a Data Object" else []) + [st.session_state.master_data] for data in [{"name" : f"{obj.name}: applications", "data" : obj.applications}, {"name" : f"{obj.name}: responses", "data" : obj.responses}]],
+                                        format_func = data_viewer_formatting, key = "DataViewerSelecter",
+                                        disabled = st.session_state.applications_entry is None and st.session_state.responses_entry is None)
+    if data_viewer_selection != "No Selection":
+      st.dataframe(data_viewer_selection["data"])
+  else:
+    st.text("Both an applications dataset and a responses dataset are required to be uploaded before any dataset can be viewed")
     
-    if st.session_state.master_data is not None:
-      data_viewer_selection = st.selectbox(label = "Select a dataset to view",
-                                          options = ["No Selection"] + [data for obj in [st.session_state.data_objects[action_data_object_index], st.session_state.master_data] for data in [{"name" : f"{obj.name}: applications", "data" : obj.applications}, {"name" : f"{obj.name}: responses", "data" : obj.responses}]],
-                                          format_func = data_viewer_formatting, key = "DataViewerSelecter",
-                                          disabled = st.session_state.applications_entry is None and st.session_state.responses_entry is None)
-      if data_viewer_selection != "No Selection":
-        st.dataframe(data_viewer_selection["data"])
-    else:
-      st.text("Both an applications dataset and a responses dataset are required to be uploaded before any dataset can be viewed")

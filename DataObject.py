@@ -186,31 +186,18 @@ def string_filter(data_object_index, column, include_values, remove_none, exact_
 
   dataset.filter_owner(column, mask)
 
-def list_string_filter(data_object_index, column, include_values, remove_none, exact_string, case_sensitive, or_gate, string_values):
+def list_string_filter(data_object_index, column, include_values, remove_none, or_gate, list_values):
   dataset = st.session_state.data_objects[data_object_index]
   col_series = dataset.key_owner(column)[0][column]
   mask = pd.Series(False if or_gate else True, index = col_series.index)
 
-  if len(string_values) != 0:
-    match (or_gate, exact_string, case_sensitive):
-      case (True, True, True):
-        mask |= pd.Series([bool([string for string in string_values if string in vals]) for vals in col_series])
-      case (True, True, False):
-        string_values_lower = [string.lower() for string in string_values]
-        mask |= pd.Series([bool([string for string in string_values_lower if string in vals]) for vals in col_series.str.lower()])
-      case (True, False, True) | (True, False, False):
-        mask |= col_series.map(lambda items: ";;".join(items)).str.contains("|".join(string_values), case = case_sensitive, na = False)
-      case (False, True, True):
-        for string in string_values:
-          mask &= pd.Series([string in vals for vals in col_series])
-      case (False, True, False):
-        for string in [string.lower() for string in string_values]:
-          mask &= pd.Series([string in vals for vals in col_series.str.lower()])
-      case (False, False, True) | (False, False, False):
-        temp_column = col_series.copy().map(lambda items: ";;".join(items))
-        for string in string_values:
-          mask &= temp_column.str.contains(string, case = case_sensitive, na = False)
-
+  if len(list_values) != 0:
+    if or_gate:
+      mask |= pd.Series([bool([text for text in list_values if text in list_vals]) for list_vals in col_series], index = col_series.index)
+    else:
+      for text in list_values:
+        mask &= pd.Series([text in list_vals for list_vals in col_series], index = col_series.index)
+    
     if not include_values:
       mask = ~mask
   else:
