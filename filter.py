@@ -263,11 +263,12 @@ with st.expander(label = "Replacing"):
   col1, col2, col3 = st.columns([2.62, 6.74, 1.64])
   with col1:
     st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Select a Column:</div>", unsafe_allow_html = True)
-  with col2:
+  with col2: #! Convert to producing the column, format as column title, create a col_name var
     options = ["Select a Column"] + ([] if action_data_object_index == "Select a Data Object" else sorted(set(list(st.session_state.data_objects[action_data_object_index].applications.keys()) + list(st.session_state.data_objects[action_data_object_index].responses.keys()))))
-    replace_col = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "ReplaceColumn", disabled = action_data_object_index == "Select a Data Object")
+    replace_col_name = st.selectbox(label = "Select a Column", options = options, label_visibility = "collapsed", key = "ReplaceColumn", disabled = action_data_object_index == "Select a Data Object")
+    replace_col = st.session_state.data_objects[action_data_object_index].key_owner(replace_col_name)[0][replace_col_name] if replace_col_name != "Select a Column" else ""
 
-  if replace_col not in [None, "Select a Column"]:
+  if replace_col_name not in [None, "Select a Column"]:
     #* None Replacement Toggle & Removal Toggle
     col1, col2, col3, col4 = st.columns([1, 3.76 if st.session_state.ReplaceNoneToggle else 2.5, 1, 12.24 if st.session_state.ReplaceNoneToggle else 13.5], gap = "xxsmall", border = False)
     with col1:
@@ -280,7 +281,7 @@ with st.expander(label = "Replacing"):
         st.markdown(f"<div style='padding-top: 9.5px;'>Replace {"" if st.session_state.ReplaceInclusionToggle else "Non-"}Selected Bounds/Values</div>", unsafe_allow_html = True)
       
     #* Variable Type Selection 
-    match type(st.session_state.data_objects[action_data_object_index].key_owner(replace_col)[0].dtypes[replace_col]):
+    match type(st.session_state.data_objects[action_data_object_index].key_owner(replace_col_name)[0].dtypes[replace_col_name]):
       #* String Variable Type
       case pd.StringDtype:
         col1, col2 = st.columns([1, 17], gap = "xxsmall")
@@ -289,16 +290,20 @@ with st.expander(label = "Replacing"):
         with col2:
           st.markdown(f"<div style='padding-top: 9.5px;'>Case {"Sensitive" if st.session_state.ReplaceCaseSensitiveToggle else "Insensitive"}</div>", unsafe_allow_html = True)
 
+        standard_replace_table = {"description" : []}
+        options = list(replace_col.unique())
+        if np.nan in options:
+          options.remove(np.nan)
         col1, col2 = st.columns([1, 1], gap = "xxsmall", border = False)
         with col1:
-          string_selections_target = st.multiselect(label = "List Text to be Replaced:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, key = "ReplaceStringSelectionsTarget")
+          string_selections_target = st.multiselect(label = "List Text to be Replaced:", disabled = st.session_state.ReplaceNoneToggle, options = standard_replace_table[cleaning_col_name] if cleaning_col_name in standard_replace_table.keys() else (options if len(options) <= 30 else None), accept_new_options = len(options) > 30, key = "ReplaceStringSelectionsTarget")
         with col2:
-          string_selections_new = st.multiselect(label = "List New Text:", options = None, accept_new_options = True, key = "ReplaceStringSelectionsNew")
+          string_selections_new = st.multiselect(label = "List New Text:", options = standard_replace_table[cleaning_col_name] if cleaning_col_name in standard_replace_table.keys() else (options if len(options) <= 30 else None), accept_new_options = True, key = "ReplaceStringSelectionsNew")
 
                              #         trying to replace entries without target selections             trying to replace without new selections                 trying to replace entries without an equal number of target and new selections                 trying to replace empty entries without exactly 1 target selection
         disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_selections_target == []) or (string_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(string_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(string_selections_target) != len(string_selections_new)) or (st.session_state.ReplaceNoneToggle and len(string_selections_new) != 1)
         replace_function_kwargs = {"action_code" : "replace_string",
-                                   "column" : replace_col,
+                                   "column" : replace_col_name,
                                    "replace_selected" : st.session_state.ReplaceInclusionToggle,
                                    "replace_none" : st.session_state.ReplaceNoneToggle,
                                    "case_sensitive" : st.session_state.ReplaceCaseSensitiveToggle,
@@ -336,7 +341,7 @@ with st.expander(label = "Replacing"):
                     #                                  trying to replace entries without either bound entered                     trying to replace entries without a new value
           disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_lower_bound == None and int_upper_bound == None) or (int_new_bound is None)
           replace_function_kwargs = {"action_code" : "replace_int_bound",
-                                     "column" : replace_col,
+                                     "column" : replace_col_name,
                                      "replace_selected" : st.session_state.ReplaceInclusionToggle,
                                      "replace_none" : st.session_state.ReplaceNoneToggle,
                                      "lower_bound" : int_lower_bound,
@@ -364,7 +369,7 @@ with st.expander(label = "Replacing"):
 #                                                 trying to replace entries without target integers       trying to replace entries without new values              trying to replace entries without an equal number of target and new selections
             disable_replace_button = (not st.session_state.ReplaceNoneToggle and int_selections_target == []) or (int_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(int_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(int_selections_target) != len(int_selections_new))
             replace_function_kwargs = {"action_code" : "replace_int_values",
-                                       "column" : replace_col,
+                                       "column" : replace_col_name,
                                        "replace_selected" : st.session_state.ReplaceInclusionToggle,
                                        "replace_none" : st.session_state.ReplaceNoneToggle,
                                        "target_values" : [int(num) for num in int_selections_target],
@@ -383,6 +388,31 @@ with st.expander(label = "Replacing"):
             st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
           st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
 
+      #* List Variable Type
+      # case np.dtypes.ObjectDType:
+      #   col1, col2 = st.columns([1, 1], gap = "xxsmall", border = False)
+      #   with col1:
+      #     string_selections_target = st.multiselect(label = "List Text to be Replaced:", disabled = st.session_state.ReplaceNoneToggle, options = None, accept_new_options = True, key = "ReplaceStringSelectionsTarget")
+      #   with col2:
+      #     string_selections_new = st.multiselect(label = "List New Text:", options = None, accept_new_options = True, key = "ReplaceStringSelectionsNew")
+
+      #                        #         trying to replace entries without target selections             trying to replace without new selections                 trying to replace entries without an equal number of target and new selections                 trying to replace empty entries without exactly 1 target selection
+      #   disable_replace_button = (not st.session_state.ReplaceNoneToggle and string_selections_target == []) or (string_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(string_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(string_selections_target) != len(string_selections_new)) or (st.session_state.ReplaceNoneToggle and len(string_selections_new) != 1)
+      #   replace_function_kwargs = {"action_code" : "replace_string",
+      #                              "column" : replace_col_name,
+      #                              "replace_selected" : st.session_state.ReplaceInclusionToggle,
+      #                              "replace_none" : st.session_state.ReplaceNoneToggle,
+      #                              "case_sensitive" : st.session_state.ReplaceCaseSensitiveToggle,
+      #                              "target_values" : string_selections_target, 
+      #                              "new_values" : string_selections_new}
+        
+        # def replace():
+        #   d.action_code_interpreter(action_data_object_index, replace_function_kwargs)
+        #   st.session_state.ReplaceStringSelectionsTarget = []
+        #   st.session_state.ReplaceStringSelectionsNew = []
+        #   st.toast(body = f"Successfully replaced entries in '{st.session_state.data_objects[action_data_object_index].name}'")
+        # st.button(label = "Replace", disabled = disable_replace_button, on_click = replace)
+      
       #* DateTime Variable Type
       case np.dtypes.DateTime64DType:
         date_tabs = st.segmented_control(label = "replace_date_tabs", options = ["Select Date Bounds", "Individual Dates"], default = "Select Date Bounds", selection_mode = "single", label_visibility = "collapsed")    
@@ -407,8 +437,8 @@ with st.expander(label = "Replacing"):
 #                                                      trying to replace entries without either bound entered                             trying to replace entries without a new value
           disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_earlier_bound == None and date_later_bound == None) or (date_new_bound is None)
           replace_function_kwargs = {"action_code" : "replace_date_bound", 
-                                     "dataset" : st.session_state.data_objects[action_data_object_index].key_owner_name(replace_col),
-                                     "column" : replace_col,
+                                     "dataset" : st.session_state.data_objects[action_data_object_index].key_owner_name(replace_col_name),
+                                     "column" : replace_col_name,
                                      "include_values" : st.session_state.ReplaceInclusionToggle,
                                      "replace_none" : st.session_state.ReplaceNoneToggle,
                                      "earlier_bound" : pd.Timestamp(date_earlier_bound),
@@ -439,7 +469,7 @@ with st.expander(label = "Replacing"):
 #                                                trying to replace entries without target dates          trying to replace entries without new values              trying to replace entries without an equal number of target and new selections              
             disable_replace_button = (not st.session_state.ReplaceNoneToggle and date_selections_target == []) or (date_selections_new == []) or (not st.session_state.ReplaceInclusionToggle and len(date_selections_target) != 1) or (not st.session_state.ReplaceNoneToggle and len(date_selections_target) != len(date_selections_new))
             replace_function_kwargs = {"action_code" : "replace_int_values",
-                                       "column" : replace_col,
+                                       "column" : replace_col_name,
                                        "include_values" : st.session_state.ReplaceInclusionToggle,
                                        "replace_none" : st.session_state.ReplaceNoneToggle,
                                        "int_target_values" : [pd.Timestamp(date) for date in date_selections_target],
