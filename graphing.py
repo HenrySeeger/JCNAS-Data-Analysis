@@ -13,6 +13,51 @@ st.session_state.setdefault("data_objects", [])
 st.session_state.setdefault("x_groups_dict", {})
 st.session_state.setdefault("y_groups_dict", {})
 
+line_markers_reference_table = {"." : "Point",
+                           "," : "Pixel",
+                           "o" : "Circle",
+                           "v" : "Triangle Down",
+                           "^" : "Triangle Up",
+                           "<" : "Triangle Left",
+                           ">" : "Triangle Right",
+                           "1" : "Tri Down",
+                           "2" : "Tri Up",
+                           "3" : "Tri Left",
+                           "4" : "Tri Right",
+                           "8" : "Octagon",
+                           "s" : "Square",
+                           "p" : "Pentagon",
+                           "P" : "Plus (Filled)",
+                           "*" : "Star",
+                           "h" : "Hexagon1",
+                           "H" : "Hexagon2",
+                           "+" : "Plus",
+                           "x" : "X",
+                           "X" : "X (Filled)",
+                           "D" : "Diamond",
+                           "d" : "Thin Diamond",
+                           "|" : "Vline",
+                           "_" : "Hline",
+                           0 : "Tick Left",
+                           1 : "Tick right",
+                           2 : "Tick Up",
+                           3 : "Tick Down",
+                           4 : "Caret Left",
+                           5 : "Caret Right",
+                           6 : "Caret Up",
+                           7 : "Caret Down",
+                           8 : "Caret Left (Centered at Base)",
+                           9 : "Caret Right (Centered at Base)",
+                           10 : "Caret Up (Centered at Base)",
+                           11 : "Caret Down (Centered at Base)"}
+
+linestyle_reference_table = {"-" : "Solid",
+                             ":" : "Dotted",
+                             (0, (1, 1)) : "Dense Dots",
+                             "--" : "Dashes",
+                             (0, (10, 3)) : "Long Dashes",
+                             "-." : "Dashes and Dots"}
+
 def interpret_colors(colors, desired_num_colors, entry_type):
   if len(colors) == 0:
     return ([plt.get_cmap("tab10")(i / 10) for i in range(10)] * (1 + desired_num_colors // 10))[:desired_num_colors]
@@ -97,7 +142,7 @@ with col2:
 
 if st.session_state.GraphTypeSelect != "Select a Graph Type":
   #* Independent Variable
-  with st.expander(label = "Independent Variable"):
+  with st.expander(label = "Independent Variable (X-Axis)"):
     #* Column Selection
     col1, col2 = st.columns([3, 9], gap = None)
     with col1:
@@ -324,7 +369,7 @@ if st.session_state.GraphTypeSelect != "Select a Graph Type":
 
   #* Dependent Variable
   if st.session_state.GraphTypeSelect in ["Line Chart"]:
-    with st.expander(label = "Dependent Variable"):
+    with st.expander(label = "Dependent Variable (Y-Axis)"):
       #* Create groups (by providing names)
       col1, col2 = st.columns([1.5, 10.5], gap = None)
       with col1:
@@ -724,15 +769,19 @@ if st.session_state.GraphTypeSelect == "Line Chart":
     line_colors_entry_type, line_colors = default_color_selectors("Line")
 
     #* Markers and Line Styles
-    col1, col2, col3, col4 = st.columns([2, 4, 2, 4], gap = None)
+    col1, col2, col3, col4 = st.columns([1.5, 4.5, 2, 4], gap = None)
     with col1:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Markers:</div>", unsafe_allow_html = True)
     with col2:
-      line_markers = st.multiselect(label = "line_markers", options = [], key = "line_markers", accept_new_options = True, label_visibility = "collapsed")
+      def line_markers_format(value):
+        return line_markers_reference_table[value]
+      line_markers = st.multiselect(label = "line_markers", options = line_markers_reference_table.keys(), key = "line_markers", accept_new_options = False, label_visibility = "collapsed", format_func = line_markers_format)
     with col3:
       st.markdown(f"<div style='padding-top: 6.5px; text-align: right; padding-right: 15px;'>Line Styles:</div>", unsafe_allow_html = True)
     with col4:
-      line_styles = st.multiselect(label = "line_styles", options = [], key = "line_styles", accept_new_options = True, label_visibility = "collapsed")
+      def line_styles_format(value):
+        return linestyle_reference_table[value]
+      line_styles = st.multiselect(label = "line_styles", options = linestyle_reference_table.keys(), key = "line_styles", accept_new_options = False, label_visibility = "collapsed", format_func = line_styles_format)
 
 #* Made for formatting graphs made with Plotly
 def plt_formatting(fig):
