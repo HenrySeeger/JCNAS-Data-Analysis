@@ -314,6 +314,25 @@ def string_values_replace(data_object_index, column, replace_selected, replace_n
       case (False, False, False):
         dataset.loc[~dataset[column].str.lower().isin(target_values), column] = new_values[0]
 
+def list_values_replace(data_object_index, column, replace_selected, replace_none, case_sensitive, target_values, new_values):
+  obj = st.session_state.data_objects[data_object_index]
+
+  for dataset in obj.key_owner(column):
+    match (replace_none, replace_selected, case_sensitive):
+      case (True, True, True) | (True, True, False):
+        dataset.fillna(value = {column : new_values[0]}, inplace = True)
+      case (True, False, True) | (True, False, False):
+        dataset.loc[dataset[column] is not None, column] = new_values[0]
+      case (False, True, True):
+        dataset.replace(to_replace = {column : {target : new for target, new in zip(target_values, new_values)}}, inplace = True)
+      case (False, True, False):
+        for target, new in zip(target_values, new_values):
+          dataset[column] = dataset[column].str.replace(target, new, case = False)
+      case (False, False, True):
+        dataset.loc[~dataset[column].isin(target_values), column] = new_values[0]
+      case (False, False, False):
+        dataset.loc[~dataset[column].str.lower().isin(target_values), column] = new_values[0]
+
 def bounds_replace(data_object_index, column, replace_selected, replace_none, lower_bound, upper_bound, new_bound):
   obj = st.session_state.data_objects[data_object_index]
 
